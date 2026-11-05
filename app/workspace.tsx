@@ -331,6 +331,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const [firmsError, setFirmsError] = useState("");
   const [firmsAttempt, setFirmsAttempt] = useState(0);
   const [childBusy, setChildBusy] = useState(false);
+  const intakeAttempt = useRef<{ payload: string; key: string } | null>(null);
   const content = useRef<HTMLDivElement>(null);
   const requestListScroll = useRef<number | null>(null);
   const currentResult = leadResult?.id === selectedId ? leadResult : undefined;
@@ -475,6 +476,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   function showIntake(show: boolean) {
     if (show === composing && !selectedId) return;
     animateWorkspace("page", () => {
+      intakeAttempt.current = null;
       applySelection();
       setComposing(show);
       window.scrollTo(0, 0);
@@ -488,9 +490,17 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     setAction("submit");
     try {
       const input = Object.fromEntries(["name", "email", "region", "category", "description"]
-        .map((name) => [name, String(form.get(name) ?? "")]));
-      const { lead: created } = await post<{ lead: Lead }>("/api/leads", input);
-      setLeads((current) => [created, ...(current ?? [])]);
+        .map((name) => {
+          const value = String(form.get(name) ?? "");
+          return [name, ["name", "email", "description"].includes(name) ? value.trim() : value];
+        }));
+      const payload = JSON.stringify(input);
+      if (intakeAttempt.current?.payload !== payload) intakeAttempt.current = { payload, key: crypto.randomUUID() };
+      const { lead: created } = await post<{ lead: Lead }>("/api/leads", input, {
+        "Idempotency-Key": intakeAttempt.current.key,
+      });
+      intakeAttempt.current = null;
+      setLeads((current) => [created, ...(current ?? []).filter(({ id }) => id !== created.id)]);
       applySelection(created.id);
       setLeadResult({ id: created.id, lead: created });
       setComposing(false);

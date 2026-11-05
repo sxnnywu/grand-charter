@@ -7,10 +7,10 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
   return data as T;
 }
 
-export function post<T>(path: string, body: Record<string, string>) {
+export function post<T>(path: string, body: Record<string, string>, headers?: Record<string, string>) {
   return request<T>(path, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...headers },
     body: JSON.stringify(body),
   });
 }
