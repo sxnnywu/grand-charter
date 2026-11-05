@@ -1,8 +1,24 @@
+export class ApiError extends Error {
+  constructor(public readonly status: number, message: string) {
+    super(message);
+  }
+}
+
+export function isAccessError(error: unknown): error is ApiError {
+  return error instanceof ApiError && [401, 403, 404].includes(error.status);
+}
+
 export async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(path, { cache: "no-store", ...options });
+  let response: Response;
+  try {
+    response = await fetch(path, { cache: "no-store", ...options });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") throw error;
+    throw new Error("Couldn’t reach the server. Check your connection and try again.");
+  }
   const data = await response.json().catch(() => null);
   if (!response.ok || data === null) {
-    throw new Error(data?.error ?? "The workspace couldn’t finish that request. Try again.");
+    throw new ApiError(response.status, data?.error ?? "The workspace couldn’t finish that request. Try again.");
   }
   return data as T;
 }

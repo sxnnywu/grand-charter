@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { categories, regions } from "@/lib/intake-options";
 import { AdminTools, type Firm } from "./admin-tools";
-import { messageFor, post, request } from "./api-client";
+import { isAccessError, messageFor, post, request } from "./api-client";
 import { CaseTools, LeadDocuments } from "./case-tools";
 import { animateWorkspace, observeScrollReveals, stopWorkspaceTransition } from "./workspace-motion";
 
@@ -129,7 +129,6 @@ export function Workspace() {
   const [sessionAttempt, setSessionAttempt] = useState(0);
   const [sessionAction, setSessionAction] = useState<"sign-in" | "sign-out" | "switch" | null>(null);
   const sessionBusy = useRef(false);
-
   useEffect(() => {
     const controller = new AbortController();
     request<Session>("/api/session", { signal: controller.signal })
@@ -331,6 +330,8 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const [firmsError, setFirmsError] = useState("");
   const [firmsAttempt, setFirmsAttempt] = useState(0);
   const [childBusy, setChildBusy] = useState(false);
+  const selectedRef = useRef(selectedId);
+  selectedRef.current = selectedId;
   const intakeAttempt = useRef<{ payload: string; key: string } | null>(null);
   const content = useRef<HTMLDivElement>(null);
   const requestListScroll = useRef<number | null>(null);
@@ -346,6 +347,21 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   if (query) parameters.set("q", query);
   const listUrl = `/api/${filter === "cases" ? "cases" : "leads"}?${parameters}`;
 
+  const onAccessLost = useCallback(() => {
+    if (selectedRef.current !== selectedId) return;
+    stopWorkspaceTransition();
+    setSelectedId(undefined);
+    setCaseId(undefined);
+    setLeadResult(undefined);
+    setChildBusy(false);
+    setAction(undefined);
+    setActionError("");
+    setLeads((current) => current?.filter(({ id }) => id !== selectedId));
+    setListAttempt((attempt) => attempt + 1);
+    writeRecordUrl(undefined, undefined, true);
+    setNotice("This record is no longer available to your account. The list has been refreshed.");
+  }, [selectedId]);
+
   useEffect(() => {
     function restoreRecord() {
       const params = new URLSearchParams(window.location.search);
@@ -356,7 +372,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       setComposing(false);
       setActionError("");
       setNotice("");
-      if (!isAdmin && linkedCase) setFilter("accepted");
+      if (linkedCase) setFilter(isAdmin ? "cases" : "accepted");
     }
     restoreRecord();
     const onHistory = () => animateWorkspace("page", restoreRecord);
@@ -445,10 +461,12 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
         if (!isPlaintiff && !isAdmin) setFilter(lead.status);
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setLeadResult({ id: selectedId, error: messageFor(error) });
+        if (controller.signal.aborted) return;
+        if (isAccessError(error)) onAccessLost();
+        else setLeadResult({ id: selectedId, error: messageFor(error) });
       });
     return () => controller.abort();
-  }, [selectedId, isPlaintiff, isAdmin]);
+  }, [selectedId, isPlaintiff, isAdmin, onAccessLost]);
 
   function applySelection(id?: string, linkedCase?: string) {
     if (selectedId !== id) setLeadResult(undefined);
@@ -530,7 +548,8 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       setFilter(updated.status);
       setNotice(decision === "accept" ? "Lead accepted and case opened." : "Lead declined and sent to admin review.");
     } catch (error) {
-      setActionError(messageFor(error));
+      if (isAccessError(error)) onAccessLost();
+      else setActionError(messageFor(error));
     } finally {
       setAction(undefined);
     }
@@ -563,15 +582,18 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     caseId && lead?.caseId === caseId ?
       <CaseDetail key={caseId} id={caseId} lead={lead} back={() => selectCase()} role={user.role}
         locked={acting} onBusyChange={setChildBusy} onStatusChange={updateCaseStatus}
+        onAccessLost={onAccessLost}
         adminTools={isAdmin ? <AdminTools lead={lead} caseView firms={firms} onUpdated={updateAssignment}
-          onBusyChange={setChildBusy} /> : undefined} /> :
+          onBusyChange={setChildBusy} onAccessLost={onAccessLost} /> : undefined} /> :
     lead ? (
       <LeadDetail key={lead.id} lead={lead} plaintiff={isPlaintiff} admin={isAdmin}
         decision={action === "submit" ? undefined : action} decideLead={decideLead}
         actionError={actionError} close={() => select()} openCase={selectCase} locked={acting}
-        tools={isAdmin ? <AdminTools lead={lead} firms={firms} onUpdated={updateAssignment} onBusyChange={setChildBusy} /> :
+        tools={isAdmin ? <AdminTools lead={lead} firms={firms} onUpdated={updateAssignment} onBusyChange={setChildBusy}
+          onAccessLost={onAccessLost} /> :
           !lead.caseId ? <LeadDocuments leadId={lead.id} role={user.role}
-            canUpload={isPlaintiff && lead.status !== "closed"} onBusyChange={setChildBusy} disabled={acting} /> : undefined} />
+            canUpload={isPlaintiff && lead.status !== "closed"} onBusyChange={setChildBusy} disabled={acting}
+            onAccessLost={onAccessLost} /> : undefined} />
     ) : (
       <div className="bookshelf-placeholder">
         <button className="subtle-link" onClick={() => select()}><Icon name="back" size={16} />{home}</button>
@@ -680,9 +702,10 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
                 {firmsError && <Message error>{firmsError}{" "}
                   <button className="subtle-link" onClick={() => { setFirmsError(""); setFirmsAttempt((attempt) => attempt + 1); }}>Try again</button>
                 </Message>}
-                {listError ? <Message error>{listError}{" "}
+                {listError && <Message error>{listError}{" "}
                   <button className="subtle-link" onClick={() => { setListError(""); setListAttempt((attempt) => attempt + 1); }}>Try again</button>
-                </Message> :
+                </Message>}
+                {(!listError || leads !== undefined) && (
                   isPlaintiff ? (
                     !leads ? <Message>Loading requests…</Message> :
                     <div className={`bookshelf${selectedId ? " has-selection" : ""}`}>
@@ -715,7 +738,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
                         setFilter(value);
                         select();
                       }} record={record} locked={acting} />
-                  )}
+                  ))}
               </div>
             )}
           </div>
@@ -907,23 +930,29 @@ function PlaintiffNotices({ notices }: { notices?: PlaintiffNotice[] }) {
   </section>;
 }
 
-function CaseDetail({ id, lead, back, role, locked, onBusyChange, onStatusChange, adminTools }: {
+function CaseDetail({ id, lead, back, role, locked, onBusyChange, onStatusChange, adminTools, onAccessLost }: {
   id: string; lead: Lead; back: () => void; role: Role; locked: boolean;
   onBusyChange: (busy: boolean) => void; onStatusChange: (status: CaseStatus) => void; adminTools?: ReactNode;
+  onAccessLost: () => void;
 }) {
   const plaintiff = role === "plaintiff";
   const [item, setItem] = useState<Case>();
   const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
     request<{ case: Case }>(`/api/cases/${id}`, { signal: controller.signal })
-      .then(({ case: item }) => setItem(item))
+      .then(({ case: item }) => {
+        if (!controller.signal.aborted) { setItem(item); setError(""); }
+      })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setError(messageFor(error));
+        if (controller.signal.aborted) return;
+        if (isAccessError(error)) onAccessLost();
+        else setError(messageFor(error));
       });
     return () => controller.abort();
-  }, [id]);
+  }, [id, onAccessLost, attempt]);
 
   return (
     <article className="motion-enter motion-detail">
@@ -935,7 +964,10 @@ function CaseDetail({ id, lead, back, role, locked, onBusyChange, onStatusChange
         </div>
       </header>
       <div className={plaintiff ? "bookshelf-detail-content" : "detail-body"}>
-        {error ? <Message error>{error}</Message> : item ? (
+        {error && <Message error>{error}{" "}
+          <button className="subtle-link" disabled={locked} onClick={() => setAttempt((current) => current + 1)}>Try again</button>
+        </Message>}
+        {item ? (
           <>
           <section className="detail-section motion-enter motion-detail">
             <h3>Case overview</h3>
@@ -950,13 +982,14 @@ function CaseDetail({ id, lead, back, role, locked, onBusyChange, onStatusChange
           </section>
           {plaintiff && <PlaintiffNotices notices={lead.notices} />}
           <CaseTools caseId={item.id} leadId={item.leadId} status={item.status} role={role}
+            disabled={locked || !!error} onAccessLost={onAccessLost}
             onBusyChange={onBusyChange} onStatusChange={(status) => {
               setItem({ ...item, status });
               onStatusChange(status);
             }} />
           {adminTools}
           </>
-        ) : <p role="status" className="muted">Loading case…</p>}
+        ) : !error && <p role="status" className="muted">Loading case…</p>}
       </div>
     </article>
   );

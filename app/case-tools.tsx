@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import { isAccessError, messageFor, request } from "./api-client";
 import "./case-tools.css";
 
 type Role = "plaintiff" | "attorney" | "paralegal" | "admin";
@@ -44,15 +45,6 @@ function formatDate(value: string) {
   return dateTime.format(new Date(value));
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(path, { cache: "no-store", ...options });
-  const body = await response.json().catch(() => null);
-  if (!response.ok || body === null) {
-    throw new Error(body?.error ?? "This request could not be completed. Try again.");
-  }
-  return body;
-}
-
 function jsonRequest(method: "POST" | "PATCH", body: Record<string, string>, key?: string): RequestInit {
   return {
     method,
@@ -61,18 +53,26 @@ function jsonRequest(method: "POST" | "PATCH", body: Record<string, string>, key
   };
 }
 
-function useRecords<T>(path: string, field: string) {
+function useRecords<T>(path: string, field: "documents" | "notes", onAccessLost?: () => void, refreshVersion = 0) {
   const [items, setItems] = useState<T[]>();
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const accessLost = useRef(onAccessLost);
+  accessLost.current = onAccessLost;
 
   useEffect(() => {
     const controller = new AbortController();
     request<Record<string, T[]>>(path, { signal: controller.signal })
       .then((result) => { if (!controller.signal.aborted) setItems(result[field]); })
-      .catch((failure: Error) => { if (!controller.signal.aborted) setError(failure.message); });
+      .catch((failure: unknown) => {
+        if (controller.signal.aborted) return;
+        if (isAccessError(failure) && accessLost.current) {
+          setItems(undefined);
+          accessLost.current();
+        } else setError(messageFor(failure));
+      });
     return () => controller.abort();
-  }, [path, field, attempt]);
+  }, [path, field, attempt, refreshVersion]);
 
   function retry() {
     setError("");
@@ -110,27 +110,31 @@ function DocumentIcon() {
   );
 }
 
-export function LeadDocuments({ leadId, canUpload, role, onBusyChange, disabled = false }: {
+export function LeadDocuments({ leadId, canUpload, role, onBusyChange, onAccessLost, refreshVersion, disabled = false }: {
   leadId: string;
   canUpload: boolean;
   role: Role;
   onBusyChange?: BusyChange;
+  onAccessLost?: () => void;
+  refreshVersion?: number;
   disabled?: boolean;
 }) {
   if (role === "admin") return null;
   return <Documents key={leadId} leadId={leadId} canUpload={canUpload} role={role} disabled={disabled}
-    onBusyChange={onBusyChange} />;
+    onBusyChange={onBusyChange} onAccessLost={onAccessLost} refreshVersion={refreshVersion} />;
 }
 
-function Documents({ leadId, canUpload, role, disabled, onBusyChange }: {
+function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLost, refreshVersion }: {
   leadId: string;
   canUpload: boolean;
   role: Exclude<Role, "admin">;
   disabled: boolean;
   onBusyChange?: BusyChange;
+  onAccessLost?: () => void;
+  refreshVersion?: number;
 }) {
   const path = `/api/leads/${leadId}/documents`;
-  const { items, error, retry, add } = useRecords<DocumentRecord>(path, "documents");
+  const { items, error, retry, add } = useRecords<DocumentRecord>(path, "documents", onAccessLost, refreshVersion);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
   const fileInput = useRef<HTMLInputElement>(null);
@@ -160,7 +164,8 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange }: {
       if (fileInput.current) fileInput.current.value = "";
       setFeedback({ notice: "PDF uploaded." });
     } catch (failure) {
-      setFeedback({ error: (failure as Error).message });
+      if (isAccessError(failure) && onAccessLost) onAccessLost();
+      else setFeedback({ error: messageFor(failure) });
     } finally {
       setSaving(false);
       onBusyChange?.(false);
@@ -204,14 +209,16 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange }: {
   );
 }
 
-function Notes({ caseId, canWrite, disabled, onBusyChange }: {
+function Notes({ caseId, canWrite, disabled, onBusyChange, onAccessLost, refreshVersion }: {
   caseId: string;
   canWrite: boolean;
   disabled: boolean;
   onBusyChange: BusyChange;
+  onAccessLost?: () => void;
+  refreshVersion?: number;
 }) {
   const path = `/api/cases/${caseId}/notes`;
-  const { items, error, retry, add } = useRecords<FirmNote>(path, "notes");
+  const { items, error, retry, add } = useRecords<FirmNote>(path, "notes", onAccessLost, refreshVersion);
   const [saving, setSaving] = useState(false);
   const [body, setBody] = useState("");
   const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
@@ -232,7 +239,8 @@ function Notes({ caseId, canWrite, disabled, onBusyChange }: {
       setBody("");
       setFeedback({ notice: "Private note added." });
     } catch (failure) {
-      setFeedback({ error: (failure as Error).message });
+      if (isAccessError(failure) && onAccessLost) onAccessLost();
+      else setFeedback({ error: messageFor(failure) });
     } finally {
       setSaving(false);
       onBusyChange(false);
@@ -276,18 +284,22 @@ function Notes({ caseId, canWrite, disabled, onBusyChange }: {
   );
 }
 
-export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusyChange }: {
+export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusyChange, onAccessLost, refreshVersion, disabled = false }: {
   caseId: string;
   leadId: string;
   status: CaseStatus;
   role: Role;
   onStatusChange: (status: CaseStatus) => void;
   onBusyChange?: BusyChange;
+  onAccessLost?: () => void;
+  refreshVersion?: number;
+  disabled?: boolean;
 }) {
   const [action, setAction] = useState<CaseTool>();
   const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
   const closeDialog = useRef<HTMLDialogElement>(null);
   const staff = role === "attorney" || role === "paralegal";
+  const busy = disabled || !!action;
   const currentStage = stages.findIndex((stage) => stage.status === status);
   const nextStatus = status === "open" ? "in_progress" : status === "in_progress" ? "closed" : undefined;
 
@@ -297,7 +309,7 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
   }
 
   async function updateProgress() {
-    if (!nextStatus || action) return;
+    if (!nextStatus || busy) return;
     report("progress", true);
     setFeedback({});
     try {
@@ -305,7 +317,8 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
       onStatusChange(updated.status);
       setFeedback({ notice: updated.status === "closed" ? "Case closed." : "Case progress updated." });
     } catch (failure) {
-      setFeedback({ error: (failure as Error).message });
+      if (isAccessError(failure) && onAccessLost) onAccessLost();
+      else setFeedback({ error: messageFor(failure) });
     } finally {
       report("progress", false);
     }
@@ -330,7 +343,7 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
         {staff && nextStatus && (
           <div className="case-progress-action">
             <button className={nextStatus === "closed" ? "button danger small" : "button primary small"}
-              type="button" disabled={!!action} onClick={() => {
+              type="button" disabled={busy} onClick={() => {
                 if (nextStatus === "closed") closeDialog.current?.showModal();
                 else void updateProgress();
               }}>
@@ -344,7 +357,7 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
                 </p></div>
                 <form className="dialog-footer" method="dialog">
                   <button className="button" type="submit">Cancel</button>
-                  <button className="button primary danger" type="button" onClick={() => {
+                  <button className="button primary danger" type="button" disabled={busy} onClick={() => {
                     closeDialog.current?.close();
                     void updateProgress();
                   }}>Close case</button>
@@ -356,10 +369,12 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
         <Feedback {...feedback} />
       </section>
       <LeadDocuments leadId={leadId} canUpload={status !== "closed"} role={role}
-        disabled={!!action} onBusyChange={(busy) => report("documents", busy)} />
+        disabled={busy} onBusyChange={(busy) => report("documents", busy)}
+        onAccessLost={onAccessLost} refreshVersion={refreshVersion} />
       {role !== "plaintiff" && (
         <Notes key={caseId} caseId={caseId} canWrite={staff && status !== "closed"}
-          disabled={!!action} onBusyChange={(busy) => report("notes", busy)} />
+          disabled={busy} onBusyChange={(busy) => report("notes", busy)}
+          onAccessLost={onAccessLost} refreshVersion={refreshVersion} />
       )}
     </>
   );
