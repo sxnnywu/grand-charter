@@ -129,6 +129,21 @@ export function Workspace() {
   const [sessionAttempt, setSessionAttempt] = useState(0);
   const [sessionAction, setSessionAction] = useState<"sign-in" | "sign-out" | "switch" | null>(null);
   const sessionBusy = useRef(false);
+  const sessionRef = useRef(session);
+  sessionRef.current = session;
+
+  const verifySession = useCallback(async (signal?: AbortSignal) => {
+    if (sessionBusy.current) return false;
+    const next = await request<Session>("/api/session", { signal });
+    if (signal?.aborted || sessionBusy.current) return false;
+    const current = sessionRef.current?.user;
+    if (current?.id === next.user?.id && current?.role === next.user?.role && current?.firmId === next.user?.firmId) return true;
+    stopWorkspaceTransition();
+    writeRecordUrl(undefined, undefined, true);
+    setSession(next);
+    return false;
+  }, []);
+
   useEffect(() => {
     const controller = new AbortController();
     request<Session>("/api/session", { signal: controller.signal })
@@ -189,9 +204,9 @@ export function Workspace() {
 
   if (session?.user) {
     const email = session.accounts.find((account) => account.id === session.user?.id)?.email ?? "";
-    return <Portal key={session.user.id} user={session.user} email={email} signOut={signOut}
+    return <Portal key={`${session.user.id}:${session.user.role}:${session.user.firmId}`} user={session.user} email={email} signOut={signOut}
       accounts={session.accounts} switchAccount={(email) => startSession(email, "switch")}
-      sessionAction={sessionAction === "sign-in" ? null : sessionAction} sessionError={sessionError} />;
+      sessionAction={sessionAction === "sign-in" ? null : sessionAction} sessionError={sessionError} verifySession={verifySession} />;
   }
 
   return (
@@ -298,9 +313,10 @@ function AccountSwitcher({ user, accounts, disabled, switching, onSwitch }: {
   );
 }
 
-function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, sessionError }: {
+function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, sessionError, verifySession }: {
   user: User; email: string; accounts: Account[]; switchAccount: (email: string) => void; signOut: () => void;
   sessionAction: "sign-out" | "switch" | null; sessionError: string;
+  verifySession: (signal?: AbortSignal) => Promise<boolean>;
 }) {
   const isPlaintiff = user.role === "plaintiff";
   const isAdmin = user.role === "admin";
@@ -330,15 +346,24 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const [firmsError, setFirmsError] = useState("");
   const [firmsAttempt, setFirmsAttempt] = useState(0);
   const [childBusy, setChildBusy] = useState(false);
+  const [accessChecking, setAccessChecking] = useState(false);
+  const [accessError, setAccessError] = useState("");
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const selectedRef = useRef(selectedId);
   selectedRef.current = selectedId;
+  const mutationBusy = useRef(false);
+  mutationBusy.current = action !== undefined || childBusy;
+  const accessBlocked = useRef(false);
+  accessBlocked.current = accessChecking || !!accessError;
+  const recheckAccess = useRef<() => void>(() => {});
+  const pendingRecheck = useRef(false);
   const intakeAttempt = useRef<{ payload: string; key: string } | null>(null);
   const content = useRef<HTMLDivElement>(null);
   const requestListScroll = useRef<number | null>(null);
   const currentResult = leadResult?.id === selectedId ? leadResult : undefined;
   const lead = currentResult && "lead" in currentResult ? currentResult.lead : undefined;
   const recordError = currentResult && "error" in currentResult ? currentResult.error : undefined;
-  const acting = action !== undefined || childBusy;
+  const acting = action !== undefined || childBusy || accessChecking || !!accessError;
   const parameters = new URLSearchParams();
   if (!isPlaintiff && filter !== "all" && filter !== "cases") parameters.set("status", filter);
   if (region) parameters.set("region", region);
@@ -356,11 +381,70 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     setChildBusy(false);
     setAction(undefined);
     setActionError("");
+    setAccessError("");
     setLeads((current) => current?.filter(({ id }) => id !== selectedId));
     setListAttempt((attempt) => attempt + 1);
     writeRecordUrl(undefined, undefined, true);
     setNotice("This record is no longer available to your account. The list has been refreshed.");
-  }, [selectedId]);
+    void verifySession().catch(() => {});
+  }, [selectedId, verifySession]);
+
+  useEffect(() => {
+    let controller: AbortController | undefined;
+    let disposed = false;
+    async function checkAccess() {
+      if (controller || document.visibilityState === "hidden") return;
+      if (mutationBusy.current) {
+        pendingRecheck.current = true;
+        return;
+      }
+      pendingRecheck.current = false;
+      controller = new AbortController();
+      const signal = controller.signal;
+      accessBlocked.current = true;
+      setAccessChecking(true);
+      setAccessError("");
+      try {
+        if (!await verifySession(signal) || disposed) return;
+        if (selectedId) {
+          const [{ lead }] = await Promise.all([
+            request<{ lead: Lead }>(`/api/leads/${selectedId}`, { signal }),
+            caseId ? request(`/api/cases/${caseId}`, { signal }) : Promise.resolve(),
+          ]);
+          if (disposed || signal.aborted) return;
+          setLeadResult({ id: selectedId, lead });
+          if (!isPlaintiff && !isAdmin) setFilter(lead.status);
+        }
+        setRefreshVersion((version) => version + 1);
+        setListAttempt((attempt) => attempt + 1);
+      } catch (error) {
+        if (disposed || signal.aborted) return;
+        if (isAccessError(error)) onAccessLost();
+        else setAccessError("We couldn’t check your current access. Your draft is still here. Reconnect and try again.");
+      } finally {
+        if (!disposed) {
+          controller = undefined;
+          setAccessChecking(false);
+        }
+      }
+    }
+    recheckAccess.current = () => { void checkAccess(); };
+    const onVisible = () => { if (document.visibilityState === "visible") void checkAccess(); };
+    window.addEventListener("focus", recheckAccess.current);
+    document.addEventListener("visibilitychange", onVisible);
+    const onFocus = recheckAccess.current;
+    return () => {
+      disposed = true;
+      controller?.abort();
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
+      setAccessChecking(false);
+    };
+  }, [selectedId, caseId, isPlaintiff, isAdmin, verifySession, onAccessLost]);
+
+  useEffect(() => {
+    if (action === undefined && !childBusy && pendingRecheck.current) recheckAccess.current();
+  }, [action, childBusy]);
 
   useEffect(() => {
     function restoreRecord() {
@@ -473,6 +557,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     setSelectedId(id);
     setCaseId(linkedCase);
     setActionError("");
+    setAccessError("");
     setNotice("");
     writeRecordUrl(id, linkedCase);
   }
@@ -503,6 +588,8 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
 
   async function submitLead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (mutationBusy.current || accessBlocked.current) return;
+    mutationBusy.current = true;
     const form = new FormData(event.currentTarget);
     setActionError("");
     setAction("submit");
@@ -526,12 +613,14 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     } catch (error) {
       setActionError(messageFor(error));
     } finally {
+      mutationBusy.current = false;
       setAction(undefined);
     }
   }
 
   async function decideLead(decision: LeadDecision) {
-    if (!lead || acting) return;
+    if (!lead || acting || mutationBusy.current || accessBlocked.current) return;
+    mutationBusy.current = true;
     setActionError("");
     setAction(decision);
     try {
@@ -551,6 +640,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       if (isAccessError(error)) onAccessLost();
       else setActionError(messageFor(error));
     } finally {
+      mutationBusy.current = false;
       setAction(undefined);
     }
   }
@@ -582,18 +672,18 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     caseId && lead?.caseId === caseId ?
       <CaseDetail key={caseId} id={caseId} lead={lead} back={() => selectCase()} role={user.role}
         locked={acting} onBusyChange={setChildBusy} onStatusChange={updateCaseStatus}
-        onAccessLost={onAccessLost}
+        onAccessLost={onAccessLost} refreshVersion={refreshVersion}
         adminTools={isAdmin ? <AdminTools lead={lead} caseView firms={firms} onUpdated={updateAssignment}
-          onBusyChange={setChildBusy} onAccessLost={onAccessLost} /> : undefined} /> :
+          onBusyChange={setChildBusy} onAccessLost={onAccessLost} refreshVersion={refreshVersion} /> : undefined} /> :
     lead ? (
       <LeadDetail key={lead.id} lead={lead} plaintiff={isPlaintiff} admin={isAdmin}
         decision={action === "submit" ? undefined : action} decideLead={decideLead}
         actionError={actionError} close={() => select()} openCase={selectCase} locked={acting}
         tools={isAdmin ? <AdminTools lead={lead} firms={firms} onUpdated={updateAssignment} onBusyChange={setChildBusy}
-          onAccessLost={onAccessLost} /> :
+          onAccessLost={onAccessLost} refreshVersion={refreshVersion} /> :
           !lead.caseId ? <LeadDocuments leadId={lead.id} role={user.role}
             canUpload={isPlaintiff && lead.status !== "closed"} onBusyChange={setChildBusy} disabled={acting}
-            onAccessLost={onAccessLost} /> : undefined} />
+            onAccessLost={onAccessLost} refreshVersion={refreshVersion} /> : undefined} />
     ) : (
       <div className="bookshelf-placeholder">
         <button className="subtle-link" onClick={() => select()}><Icon name="back" size={16} />{home}</button>
@@ -646,7 +736,11 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
         <div className="content motion-enter" ref={content} inert={!!sessionAction}>
           {sessionError && <Message error>{sessionError}</Message>}
           {notice && <Message>{notice}</Message>}
-          <div className="portal-page" key={composing ? "intake" : "list"}>
+          {accessChecking && <Message>Checking your current access…</Message>}
+          {accessError && <Message error>{accessError}{" "}
+            <button className="subtle-link" onClick={() => recheckAccess.current()}>Try again</button>
+          </Message>}
+          <div className="portal-page" key={composing ? "intake" : "list"} inert={accessChecking || !!accessError}>
             {composing ? (
               <Intake name={user.name} email={email} submit={submitLead} cancel={() => showIntake(false)}
                 submitting={acting} error={actionError} />
@@ -930,10 +1024,10 @@ function PlaintiffNotices({ notices }: { notices?: PlaintiffNotice[] }) {
   </section>;
 }
 
-function CaseDetail({ id, lead, back, role, locked, onBusyChange, onStatusChange, adminTools, onAccessLost }: {
+function CaseDetail({ id, lead, back, role, locked, onBusyChange, onStatusChange, adminTools, onAccessLost, refreshVersion }: {
   id: string; lead: Lead; back: () => void; role: Role; locked: boolean;
   onBusyChange: (busy: boolean) => void; onStatusChange: (status: CaseStatus) => void; adminTools?: ReactNode;
-  onAccessLost: () => void;
+  onAccessLost: () => void; refreshVersion: number;
 }) {
   const plaintiff = role === "plaintiff";
   const [item, setItem] = useState<Case>();
@@ -952,7 +1046,7 @@ function CaseDetail({ id, lead, back, role, locked, onBusyChange, onStatusChange
         else setError(messageFor(error));
       });
     return () => controller.abort();
-  }, [id, onAccessLost, attempt]);
+  }, [id, refreshVersion, onAccessLost, attempt]);
 
   return (
     <article className="motion-enter motion-detail">
@@ -982,7 +1076,7 @@ function CaseDetail({ id, lead, back, role, locked, onBusyChange, onStatusChange
           </section>
           {plaintiff && <PlaintiffNotices notices={lead.notices} />}
           <CaseTools caseId={item.id} leadId={item.leadId} status={item.status} role={role}
-            disabled={locked || !!error} onAccessLost={onAccessLost}
+            disabled={locked || !!error} onAccessLost={onAccessLost} refreshVersion={refreshVersion}
             onBusyChange={onBusyChange} onStatusChange={(status) => {
               setItem({ ...item, status });
               onStatusChange(status);
