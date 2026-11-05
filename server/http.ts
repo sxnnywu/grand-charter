@@ -16,7 +16,7 @@ export async function api(request: NextRequest, run: () => Promise<NextResponse>
       const origin = request.headers.get("origin");
       const host = request.headers.get("host");
       if (origin && origin !== `${request.nextUrl.protocol}//${host}`) {
-        throw new RequestError(403, "This action must come from Grand Charter.");
+        throw new RequestError(403, "This action must come from Brief.");
       }
     }
     return await run();

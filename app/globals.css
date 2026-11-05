@@ -1,19 +1,54 @@
 @import "../prototype/styles.css";
 
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .demo-entry {
+  position: relative;
+  isolation: isolate;
   display: grid;
+  grid-template-columns: minmax(0, 440px);
   min-height: 100dvh;
-  place-items: center;
+  place-content: center;
   padding: 24px 16px;
+  overflow: clip;
+}
+
+.demo-entry::before, .demo-entry::after {
+  grid-area: 1 / 1;
+  z-index: 0;
+  border: 1px solid #d7d1c5;
+  border-radius: var(--radius);
+  background: #e9e4d9;
+  transform: translate(-4px, 7px) rotate(-2deg);
+  pointer-events: none;
+  content: "";
+}
+
+.demo-entry::after {
+  background: #f6f2e8;
+  transform: translate(5px, 4px) rotate(1.5deg);
 }
 
 .demo-entry-card {
+  position: relative;
+  grid-area: 1 / 1;
+  z-index: 1;
   width: min(100%, 440px);
   padding: clamp(22px, 5vw, 36px);
+  box-shadow: 0 8px 28px #282c3710;
 }
 
-.demo-entry-card .brand {
-  margin: 0 0 24px;
+.demo-entry-card .sign-in-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .demo-entry-card .page-heading {
@@ -269,6 +304,26 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
+  .demo-entry:not([data-settled])::before {
+    animation: sign-in-back-sheet 650ms cubic-bezier(.2, .75, .3, 1) backwards;
+  }
+
+  .demo-entry:not([data-settled])::after {
+    animation: sign-in-middle-sheet 650ms 65ms cubic-bezier(.2, .75, .3, 1) backwards;
+  }
+
+  .demo-entry:not([data-settled]) .demo-entry-card {
+    animation: sign-in-arrive 650ms 100ms cubic-bezier(.2, .75, .3, 1) backwards;
+  }
+
+  .demo-entry:not([data-settled]) .demo-entry-card > .page-heading {
+    animation: sign-in-content 260ms 310ms ease-out backwards;
+  }
+
+  .demo-entry:not([data-settled]) .demo-entry-card > :is(.form-stack, .demo-notice) {
+    animation: sign-in-content 260ms 440ms ease-out backwards;
+  }
+
   html[data-workspace-transition] {
     view-transition-name: none;
   }
@@ -361,6 +416,27 @@
       transform: translateX(2px);
     }
   }
+}
+
+@keyframes sign-in-back-sheet {
+  from { opacity: 0; transform: translate(-45px, 38px) rotate(-12deg); }
+  to { opacity: 1; transform: translate(-4px, 7px) rotate(-2deg); }
+}
+
+@keyframes sign-in-middle-sheet {
+  from { opacity: 0; transform: translate(40px, 30px) rotate(10deg); }
+  to { opacity: 1; transform: translate(5px, 4px) rotate(1.5deg); }
+}
+
+@keyframes sign-in-arrive {
+  0% { opacity: 0; transform: translateY(22px) rotate(2deg) scale(.97); }
+  75% { opacity: 1; transform: translateY(-2px) rotate(-.3deg) scale(1); }
+  100% { opacity: 1; transform: none; }
+}
+
+@keyframes sign-in-content {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: none; }
 }
 
 @keyframes workspace-enter {

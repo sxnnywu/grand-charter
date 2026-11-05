@@ -1,4 +1,4 @@
-# Grand Charter
+# Brief
 
 ## Run the app locally
 
@@ -13,7 +13,7 @@ npm run db:seed
 npm run dev
 ```
 
-Open [Grand Charter](http://127.0.0.1:3000). Choose a fictional demo account. Each account uses the password `grand-charter-demo`.
+Open [Brief](http://127.0.0.1:3000). Choose a fictional demo account. Each account uses the password `grand-charter-demo`.
 
 1. Sign in as Maya and submit an **Employment** lead in **Ontario**. That pair routes to Northline Legal.
 2. Open the request and upload a sample PDF. Use **Switch account** to choose Alex or Priya at Northline. Open the lead from the inbox and accept it.

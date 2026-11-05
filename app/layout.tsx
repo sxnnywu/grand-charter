@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Grand Charter",
+  title: "Brief",
   description: "Legal intake and case management",
 };
 
