@@ -27,6 +27,8 @@ const option = (value, label = value) => `<option value="${escape(value)}">${esc
 const button = (action, label, style = 'secondary', symbol, value) =>
   `<button type="button" class="button ${style}" data-action="${action}" ${value ? `data-value="${escape(value)}"` : ''}>${symbol ? icon(symbol, 16) : ''}${label}</button>`;
 
+const folioMark = '<span class="brand-mark"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M7 3.5h7l4 4V20H7V3.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M14 3.5v4h4M4 7v15h11M10 12h5m-5 4h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+
 function roleName(actor) {
   if (actor.role === 'firm') return firmName(actor.firmId);
   return actor.role === 'admin' ? 'Platform admin' : 'Plaintiff portal';
@@ -79,12 +81,12 @@ function shell(content) {
   return `<div class="shell">
     <aside class="sidebar" aria-label="Workspace">
       <button class="brand" type="button" data-action="home">
-        <span class="brand-mark"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 19V5l8 4 8-4v14l-8 3-8-3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 9v13M8 11v5m8-5v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></span>
+        ${folioMark}
         <span class="brand-text">Grand Charter</span>
       </button>
       <div class="workspace-label">Workspace</div>
       <nav class="nav-list" aria-label="Main navigation">${nav.map(([page, label, symbol]) => `
-        <button type="button" class="nav-item ${view.page === page || (page === 'requests' && view.page === 'detail') ? 'active' : ''}" data-action="page" data-value="${page}">${icon(symbol)}<span>${label}</span></button>`).join('')}
+        <button type="button" class="nav-item ${view.page === page ? 'active' : ''}" data-action="page" data-value="${page}">${icon(symbol)}<span>${label}</span></button>`).join('')}
       </nav>
       <div class="sidebar-bottom">
         <div class="actor-card"><span class="avatar">${escape(initials(actor.name))}</span><div><strong>${escape(actor.name)}</strong><small>${escape(roleName(actor))}</small></div></div>
@@ -114,41 +116,75 @@ function plaintiffStatus(lead) {
   return status(lead.status);
 }
 
-function requestList(leads) {
-  const firstName = escape(view.actor.name.split(' ')[0]);
-  const stats = [
-    ['folder', 'Total requests', leads.length],
-    ['clock', 'Awaiting review', leads.filter(lead => ['pending', 'review', 'declined'].includes(lead.status)).length],
-    ['briefcase', 'Open cases', leads.filter(lead => lead.caseId && lead.caseStatus !== 'closed').length],
-  ];
-  return `<section class="page-heading split-heading">
-    <div><p class="eyebrow">Plaintiff portal</p><h1>My requests</h1><p>Track your requests, see case progress, and share documents with your firm.</p></div>
-    ${button('page', 'Submit a request', 'primary', 'plus', 'new')}
-  </section>
-  <div class="hero-card">
-    <div class="hero-copy"><p class="eyebrow">Your workspace</p><h2>Welcome, ${firstName}.</h2><p>Find your requests and case updates here whenever you need them.</p></div>
-    <div class="hero-art" aria-hidden="true"><svg viewBox="0 0 250 140" fill="none"><circle cx="185" cy="65" r="89" stroke="currentColor"/><circle cx="185" cy="65" r="69" stroke="currentColor"/><circle cx="185" cy="65" r="49" stroke="currentColor"/><path d="M44 111h139M75 94h109M102 77h82" stroke="currentColor" stroke-linecap="round"/><rect x="121" y="23" width="53" height="66" rx="8" fill="#f8f8ff" stroke="#8c8fbd"/><path d="M133 42h26m-26 11h29m-29 11h19" stroke="#8c8fbd" stroke-linecap="round"/><circle cx="177" cy="77" r="13" fill="#555895"/><path d="m172 77 3 3 6-6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-  </div>
-  <div class="summary-grid">${stats.map(([symbol, label, value]) => `<div class="summary-card"><span class="metric-icon">${icon(symbol)}</span><div><strong class="metric-value">${value}</strong><div class="muted">${label}</div></div></div>`).join('')}</div>
-  <div class="plaintiff-grid">
-    <section class="panel request-list">
-      <div class="card-heading"><div><h2>Your requests</h2><p>Open a request to see its details and documents.</p></div></div>
-      ${leads.length ? leads.map(lead => `<button class="request-card" type="button" data-action="open-request" data-value="${escape(lead.id)}"><span class="request-icon">${icon('file')}</span><span class="request-copy"><strong>${escape(lead.category)}</strong><small>${escape(lead.id)} · Submitted ${date(lead.createdAt)}</small></span><span class="request-meta">${plaintiffStatus(lead)}${icon('chevron-right', 16)}</span></button>`).join('') : '<p class="empty">You haven’t submitted a request yet.</p>'}
+function requestStatusMessage(lead) {
+  const firm = firmName(lead.firmId);
+  switch (lead.status) {
+    case 'review': return `${firm} is reviewing your request.`;
+    case 'pending': return 'An admin will look for a firm to review your request.';
+    case 'declined': return 'An admin is reviewing what to do with your request next.';
+    case 'closed': return lead.notice || 'Your request was closed.';
+    case 'accepted':
+      if (lead.caseStatus === 'closed') return `${firm} closed your case. You can still view your documents.`;
+      if (lead.caseStatus === 'progress') return `${firm} is working on your case.`;
+      return `${firm} accepted your request and opened a case.`;
+  }
+}
+
+function requestTitle(lead) {
+  const firstSentence = lead.description.trim().split(/(?<=[.!?])\s+/)[0].replace(/[.!?]$/, '');
+  if (firstSentence.length <= 78) return firstSentence || lead.category;
+  const lastClause = firstSentence.split(/, (?:and|but) (?=(?:I|my|we|our)\b)/i).at(-1);
+  if (lastClause.length <= 78) return lastClause[0].toUpperCase() + lastClause.slice(1);
+  const excerpt = firstSentence.slice(0, 75);
+  return (excerpt.slice(0, Math.max(0, excerpt.lastIndexOf(' '))) || excerpt) + '…';
+}
+
+function requestList(leads, selected) {
+  const latest = leads.filter(lead => lead.latestUpdateAt)
+    .sort((a, b) => b.latestUpdateAt.localeCompare(a.latestUpdateAt))[0];
+  const reading = selected ? requestDetail(selected) : `
+    <div class="bookshelf-placeholder">
+      ${folioMark}
+      <h2>Choose a request</h2>
+      <p>Open a request to see its status and documents.</p>
+    </div>`;
+
+  return `<div class="plaintiff-home">
+    <section class="page-heading split-heading">
+      <div><h1>My requests</h1><p>Check your progress and share documents with your firm.</p></div>
+      ${button('page', 'Submit a request', 'primary', 'plus', 'new')}
     </section>
-    <aside class="panel demo-guide">
-      <div class="card-heading"><div><h2>What happens next</h2><p>From request to case</p></div></div>
-      <ol class="step-list">
-        <li class="guide-step"><span>1</span><div><strong>Tell us about your situation</strong><p>Share a few details and any relevant PDFs.</p></div></li>
-        <li class="guide-step"><span>2</span><div><strong>A firm reviews your request</strong><p>If we can’t match it, an admin will review it.</p></div></li>
-        <li class="guide-step"><span>3</span><div><strong>Follow your case</strong><p>If a firm accepts, you’ll see case updates and shared documents here.</p></div></li>
-      </ol>
-    </aside>
+    <div class="bookshelf ${selected ? 'has-selection' : ''}">
+      <div class="bookshelf-index">
+        ${latest ? `<section class="plaintiff-updates" aria-labelledby="updates-title">
+          <h2 id="updates-title" class="eyebrow">Latest update</h2>
+          <button class="update-row" type="button" data-action="open-request" data-value="${escape(latest.id)}">
+            <span class="request-icon">${icon('activity', 18)}</span>
+            <span class="request-copy"><strong>${escape(requestStatusMessage(latest))}</strong><small>${escape(latest.caseId ?? latest.id)} · ${date(latest.latestUpdateAt)}</small></span>
+            ${icon('chevron-right', 16)}
+          </button>
+        </section>` : ''}
+        <section class="request-list" aria-labelledby="requests-title">
+          <div class="card-heading"><div><h2 id="requests-title">All requests</h2></div></div>
+          ${leads.length ? leads.map(lead => `<button class="request-card" type="button" data-action="open-request" data-value="${escape(lead.id)}" aria-pressed="${lead.id === selected?.id}">
+            <span class="request-icon">${icon('file')}</span>
+            <span class="request-copy">
+              <strong class="request-title">${escape(requestTitle(lead))}</strong>
+              <small>${escape(lead.category)} · ${escape(lead.id)} · ${date(lead.createdAt)}</small>
+              <span class="request-meta">${plaintiffStatus(lead)}</span>
+            </span>
+            ${icon('chevron-right', 16)}
+          </button>`).join('') : '<p class="empty">You haven’t submitted a request yet.</p>'}
+        </section>
+      </div>
+      ${leads.length ? `<section class="bookshelf-reading" aria-label="Request details">${reading}</section>` : ''}
+    </div>
   </div>`;
 }
 
 function newRequest() {
   return `<button class="subtle-link" type="button" data-action="page" data-value="requests">${icon('arrow-left', 16)} My requests</button>
-  <section class="page-heading"><p class="eyebrow">Plaintiff portal</p><h1>Submit a request</h1><p>Tell us about your situation so we can match your request with a firm.</p></section>
+  <section class="page-heading"><h1>Submit a request</h1><p>Tell us about your situation so we can match your request with a firm.</p></section>
   <div class="plaintiff-grid">
     <form class="panel detail-card form-stack" id="intake">
       <div class="card-heading"><div><h2>Request details</h2><p>All fields are required except the PDF.</p></div></div>
@@ -163,27 +199,35 @@ function newRequest() {
       <p class="form-error" role="alert" hidden></p>
       <div class="detail-actions">${button('page', 'Cancel', 'secondary', undefined, 'requests')}<button class="button primary" type="submit">Submit request ${icon('arrow-right', 16)}</button></div>
     </form>
-    <aside class="panel demo-guide"><div class="card-heading"><div><h2>Before you submit</h2><p>Include what happened, where it happened, and what help you’re looking for.</p></div></div><div class="notice">${icon('info')}<span>This is a local prototype. Use fictional information and sample PDFs.</span></div></aside>
+    <aside class="panel demo-guide"><div class="intake-folio">${folioMark}<span>Grand Charter</span></div><div class="card-heading"><div><h2>Before you submit</h2><p>Include what happened, where it happened, and what help you’re looking for.</p></div></div><div class="notice">${icon('info')}<span>This is a local prototype. Use fictional information and sample PDFs.</span></div></aside>
   </div>`;
 }
 
 function requestDetail(lead) {
-  if (!lead) return '<p class="empty">This request is unavailable.</p>';
   const documents = filesFor(view.actor, lead);
   const progress = [['open', 'Case opened'], ['progress', 'In progress'], ['closed', 'Closed']];
   const current = progress.findIndex(([key]) => key === lead.caseStatus);
-  return `<button class="subtle-link" type="button" data-action="page" data-value="requests">${icon('arrow-left', 16)} My requests</button>
-  <section class="page-heading split-heading"><div><p class="eyebrow">Request ${escape(lead.id)}${lead.caseId ? ` · Case ${escape(lead.caseId)}` : ''}</p><h1>${escape(lead.category)}</h1><p>Submitted ${date(lead.createdAt)} · ${escape(lead.region)}</p></div>${plaintiffStatus(lead)}</section>
-  ${lead.notice ? `<div class="notice" role="status">${icon('info')}<span>${escape(lead.notice)}</span></div>` : ''}
-  <div class="plaintiff-grid detail-layout">
-    <div class="stack">
-      <section class="panel detail-card"><div class="card-heading"><div><h2>Request details</h2><p>${lead.firmId ? escape(firmName(lead.firmId)) : 'Awaiting assignment or admin review'}</p></div></div><p class="detail-copy">${escape(lead.description)}</p></section>
-      <section class="panel detail-card"><div class="card-heading"><div><h2>Documents</h2><p>PDFs shared with your case or request.</p></div>${lead.status !== 'closed' && lead.caseStatus !== 'closed' ? upload() : ''}</div>${fileList(documents)}</section>
+  const canUpload = lead.status !== 'closed' && lead.caseStatus !== 'closed';
+  return `<header class="bookshelf-detail-header">
+    <button class="subtle-link bookshelf-close" type="button" data-action="close-request">${icon('arrow-left', 16)} <span>All requests</span></button>
+    <div><p class="eyebrow">Request ${escape(lead.id)}${lead.caseId ? ` · Case ${escape(lead.caseId)}` : ''}</p>
+      <h2 tabindex="-1">${escape(requestTitle(lead))}</h2>
+      <p>${escape(lead.category)} · ${escape(lead.region)} · Submitted ${date(lead.createdAt)}</p>
     </div>
-    <aside class="panel demo-guide">
-      <div class="card-heading"><div><h2>Progress</h2><p>${lead.caseId ? 'Updates from your assigned firm' : 'Current request status'}</p></div></div>
-      ${lead.caseId ? `<ol class="timeline">${progress.map(([key, label], index) => `<li class="timeline-item ${index <= current ? 'active' : ''}">${icon(index < current ? 'check-circle' : 'circle', 17)}<span>${label}</span>${key === lead.caseStatus ? '<small>Current</small>' : ''}</li>`).join('')}</ol>` : `<div class="notice">${icon('clock')}<span>${lead.status === 'closed' ? 'Your request is closed.' : lead.status === 'review' ? 'Your request is with a firm for review.' : 'Your request is waiting for an admin to review it.'}</span></div>`}
-    </aside>
+  </header>
+  <div class="bookshelf-detail-content">
+    <section class="request-status-message" aria-labelledby="status-title">
+      <div class="bookshelf-status-content"><span class="request-icon">${icon(lead.caseId ? 'activity' : 'clock')}</span>
+        <div><h3 id="status-title">Where things stand</h3><p>${escape(requestStatusMessage(lead))}</p></div>
+      </div>
+      ${canUpload ? `<div class="request-next-action">${upload('Add a PDF')}</div>` : ''}
+    </section>
+    ${lead.notice && lead.status !== 'closed' ? `<div class="notice">${icon('info')}<span>${escape(lead.notice)}</span></div>` : ''}
+    <section class="bookshelf-section"><h3>Your request</h3><p class="detail-copy">${escape(lead.description)}</p></section>
+    <section class="bookshelf-section"><h3>Documents</h3>${fileList(documents)}</section>
+    ${lead.caseId ? `<section class="bookshelf-section"><h3>Case progress</h3>
+      <ol class="timeline">${progress.map(([key, label], index) => `<li class="timeline-item ${index <= current ? 'active' : ''}" ${key === lead.caseStatus ? 'aria-current="step"' : ''}>${icon(index < current ? 'check-circle' : 'circle', 17)}<span>${label}</span>${key === lead.caseStatus ? '<small>Current</small>' : ''}</li>`).join('')}</ol>
+    </section>` : ''}
   </div>`;
 }
 
@@ -203,8 +247,7 @@ function staffContent(all) {
     }
     if (view.category && lead.category !== view.category) return false;
     if (view.region && lead.region !== view.region) return false;
-    return !term || [lead.id, lead.caseId, lead.name, lead.category, firmName(lead.firmId)]
-      .some(value => String(value ?? '').toLowerCase().includes(term));
+    return matchesSearch(lead, term);
   });
   const lead = leads.find(item => item.id === view.selected) ?? leads[0];
   view.selected = lead?.id ?? null;
@@ -216,16 +259,113 @@ function staffContent(all) {
   });
 }
 
+function matchesSearch(lead, term) {
+  return !term || [lead.id, lead.caseId, lead.name, lead.category, firmName(lead.firmId)]
+    .some(value => String(value ?? '').toLowerCase().includes(term));
+}
+
 function render() {
+  const indexScroll = app.querySelector('.bookshelf-index')?.scrollTop ?? 0;
+  const previousTabs = tabBounds();
   displayedFiles = [];
   const leads = leadsFor(view.actor).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const content = view.actor.role === 'plaintiff'
-    ? view.page === 'new' ? newRequest() : view.page === 'detail' ? requestDetail(getLead(view.actor, view.selected)) : requestList(leads)
+    ? view.page === 'new' ? newRequest() : requestList(leads, leads.find(lead => lead.id === view.selected))
     : staffContent(leads);
   app.innerHTML = shell(content);
+  const index = app.querySelector('.bookshelf-index');
+  if (index) index.scrollTop = indexScroll;
+  drawTabIndicators(previousTabs);
+  view.auditHighlightId = null;
+}
+
+function tabBounds() {
+  return Object.fromEntries(['staff-tabs', 'case-tabs'].map(name => {
+    const tab = app.querySelector(`.${name} [aria-pressed="true"]`);
+    return [name, tab && { x: tab.offsetLeft, width: tab.offsetWidth, value: tab.dataset.value }];
+  }));
+}
+
+function drawTabIndicators(previous = {}) {
+  for (const [name, bounds] of Object.entries(tabBounds())) {
+    if (!bounds) continue;
+    const nav = app.querySelector(`.${name}`);
+    const indicator = nav.querySelector('.tab-indicator') ?? document.createElement('span');
+    const from = previous[name];
+    indicator.className = 'tab-indicator';
+    indicator.setAttribute('aria-hidden', 'true');
+    indicator.style.setProperty('--tab-x', `${bounds.x}px`);
+    indicator.style.setProperty('--tab-width', `${bounds.width}px`);
+    if (from && from.value !== bounds.value) {
+      indicator.classList.add('is-sliding');
+      indicator.style.setProperty('--tab-from-x', `${from.x}px`);
+      indicator.style.setProperty('--tab-from-width', `${from.width}px`);
+    }
+    if (!indicator.parentElement) nav.append(indicator);
+  }
+}
+
+function setRequestUrl(id, push = false) {
+  const url = new URL(location.href);
+  if (id) url.searchParams.set('request', id);
+  else url.searchParams.delete('request');
+  if (push) history.pushState({ requestOpenedFromList: true, listScroll: view.bookshelfScroll }, '', url);
+  else history.replaceState(id ? history.state : null, '', url);
+}
+
+function showRequest(id, updateUrl = true) {
+  if (view.actor.role !== 'plaintiff' || !getLead(view.actor, id) || view.selected === id) return;
+  const switching = Boolean(view.selected);
+  if (!switching) view.bookshelfScroll = updateUrl ? window.scrollY : (history.state?.listScroll ?? window.scrollY);
+  if (updateUrl) setRequestUrl(id, !switching);
+  view.page = 'requests';
+  view.selected = id;
+  render();
+  const pane = app.querySelector('.bookshelf-reading');
+  pane.classList.add(switching ? 'is-switching' : 'is-opening');
+  if (matchMedia('(max-width: 760px)').matches) window.scrollTo(0, 0);
+  pane.querySelector('h2').focus({ preventScroll: true });
+}
+
+function returnToRequests() {
+  const previous = view.selected;
+  view.selected = null;
+  view.page = 'requests';
+  render();
+  app.querySelector('.bookshelf-index')?.classList.add('is-returning');
+  window.scrollTo(0, view.bookshelfScroll ?? 0);
+  app.querySelector(`.request-card[data-value="${CSS.escape(previous ?? '')}"]`)?.focus({ preventScroll: true });
+}
+
+async function closeRequest() {
+  const pane = app.querySelector('.bookshelf-reading');
+  if (!pane || pane.classList.contains('is-closing')) return;
+  const id = view.selected;
+  pane.classList.add('is-closing');
+  await Promise.allSettled(pane.getAnimations().map(animation => animation.finished));
+  if (view.selected !== id || view.actor.role !== 'plaintiff') return;
+  if (history.state?.requestOpenedFromList) {
+    history.back();
+  } else {
+    setRequestUrl(null);
+    returnToRequests();
+  }
+}
+
+function revealStaffDetail() {
+  app.querySelector('.staff-detail[data-record]')?.classList.add('is-entering');
+}
+
+function focusAfterDialog(selector, motionClass) {
+  dialog.addEventListener('close', () => {
+    const target = app.querySelector(selector);
+    if (motionClass) target?.classList.add(motionClass);
+    target?.focus();
+  }, { once: true });
 }
 
 function openDialog({ title, copy = '', body = '', label, danger = false, submit }) {
+  dialog.classList.remove('is-closing');
   dialogSubmit = submit;
   dialog.innerHTML = `<form id="dialog-form">
     <div class="dialog-head"><div><h2 id="dialog-title">${escape(title)}</h2>${copy ? `<p>${escape(copy)}</p>` : ''}</div>
@@ -235,6 +375,13 @@ function openDialog({ title, copy = '', body = '', label, danger = false, submit
     <div class="dialog-footer">${button('dismiss', label ? 'Cancel' : 'Done')}${label ? `<button type="submit" class="button ${danger ? 'danger' : 'primary'}">${escape(label)}</button>` : ''}</div>
   </form>`;
   dialog.showModal();
+}
+
+async function dismissDialog() {
+  if (dialog.classList.contains('is-closing')) return;
+  dialog.classList.add('is-closing');
+  await Promise.allSettled(dialog.getAnimations().map(animation => animation.finished));
+  dialog.close();
 }
 
 async function readPdf(file) {
@@ -262,6 +409,8 @@ function currentLead() {
 }
 
 function route(page) {
+  const navigating = view.page !== page;
+  if (view.actor.role === 'plaintiff' && view.selected) setRequestUrl(null);
   view.page = page;
   view.selected = null;
   view.category = '';
@@ -271,6 +420,7 @@ function route(page) {
   if (page === 'inbox') view.filter = 'review';
   if (page === 'queue') view.filter = 'pending';
   render();
+  if (navigating) app.querySelector('.content').classList.add('is-navigating');
   window.scrollTo(0, 0);
 }
 
@@ -293,22 +443,26 @@ async function handleAction(action, value) {
     case 'home': route(navigation()[0][0]); break;
     case 'page': route(value); break;
     case 'filter':
+      if (view.filter === value) break;
       view.filter = value;
       view.selected = null;
       view.caseTab = 'overview';
       render();
+      app.querySelector('.staff-detail[data-record]')?.classList.add('is-tab-changing');
+      app.querySelector('.staff-tabs [aria-pressed="true"]')?.focus({ preventScroll: true });
       break;
     case 'select':
+      if (view.selected === value) break;
       view.selected = value;
       view.caseTab = 'overview';
       render();
+      revealStaffDetail();
+      app.querySelector('[data-action="select"][aria-pressed="true"]')?.focus({ preventScroll: true });
       break;
     case 'open-request':
-      view.page = 'detail';
-      view.selected = value;
-      render();
-      window.scrollTo(0, 0);
+      showRequest(value);
       break;
+    case 'close-request': await closeRequest(); break;
     case 'open-case':
       view.page = 'cases';
       view.selected = value || view.selected;
@@ -317,22 +471,39 @@ async function handleAction(action, value) {
       view.query = '';
       view.caseTab = 'overview';
       render();
+      revealStaffDetail();
+      const caseTitle = app.querySelector('.staff-detail h2');
+      if (caseTitle) {
+        caseTitle.tabIndex = -1;
+        caseTitle.focus({ preventScroll: true });
+      }
       break;
-    case 'case-tab': view.caseTab = value; render(); break;
-    case 'dismiss': dialog.close(); break;
+    case 'case-tab':
+      if (view.caseTab === value) break;
+      view.caseTab = value;
+      render();
+      app.querySelector('.staff-detail[data-record]')?.classList.add('is-tab-changing');
+      app.querySelector('.case-tabs [aria-pressed="true"]')?.focus({ preventScroll: true });
+      break;
+    case 'dismiss': await dismissDialog(); break;
     case 'view-file': await previewFile(Number(value)); break;
     case 'reset':
       openDialog({
         title: 'Reset the demo?', copy: 'Restore sample records and clear changes made in this browser.',
         label: 'Reset demo', danger: true,
-        submit: () => { reset(); resetView(); done('Demo reset.'); },
+        submit: () => { reset(); setRequestUrl(null); resetView(); done('Demo reset.'); },
       });
       break;
     case 'accept':
       openDialog({
         title: 'Accept this lead?', copy: 'Accepting opens a case and moves the lead to your Accepted inbox.',
         label: 'Accept lead',
-        submit: () => { acceptLead(actor, lead.id); view.filter = 'accepted'; done('Lead accepted. The case is ready to open.'); },
+        submit: () => {
+          acceptLead(actor, lead.id);
+          view.filter = 'accepted';
+          done('Lead accepted.');
+          focusAfterDialog('[data-action="open-case"]', 'is-handoff');
+        },
       });
       break;
     case 'decline':
@@ -350,14 +521,23 @@ async function handleAction(action, value) {
       openDialog({
         title: `${verb} ${isCase ? 'case' : 'lead'}`,
         copy: isCase
-          ? `The new firm receives the case, linked lead, and plaintiff PDFs. ${firmName(lead.firmId)} loses access and keeps ownership of its private notes.`
+          ? 'The receiving firm gets the case, linked lead, and plaintiff PDFs. The current firm loses access to the case and retains ownership of its private notes.'
           : 'The lead will appear in the receiving firm’s active inbox.',
-        body: `<label class="field">Receiving firm<select name="firmId" required>${option('', 'Choose a firm')}${candidates.map(firm => option(firm.id, firm.name)).join('')}</select></label>`,
+        body: `<label class="field">Receiving firm<select name="firmId" data-firm-select required>${option('', 'Choose a firm')}${candidates.map(firm => option(firm.id, firm.name)).join('')}</select></label>
+          <div class="assignment-preview" aria-live="polite">
+            <div class="assignment-from"><small>Current assignment</small><strong>${escape(firmName(lead.firmId))}</strong></div>
+            ${icon('arrow-right', 19)}
+            <div class="assignment-to"><small>Receiving firm</small><strong data-receiving-firm>Choose a firm</strong></div>
+          </div>`,
         label: verb,
         submit: data => {
-          assignLead(actor, lead.id, data.get('firmId'));
+          const assigned = assignLead(actor, lead.id, data.get('firmId'));
+          if (!matchesSearch(assigned, view.query.trim().toLowerCase())) view.query = '';
           if (view.page === 'queue') view.filter = 'all';
+          view.caseTab = 'overview';
+          view.auditHighlightId = lead.id;
           done(`${isCase ? 'Case' : 'Lead'} ${isAssigned ? 'reassigned' : 'assigned'}.`);
+          focusAfterDialog('.audit-entry.is-audit-highlight');
         },
       });
       break;
@@ -366,7 +546,14 @@ async function handleAction(action, value) {
       openDialog({
         title: 'Close this lead?', copy: 'The firm assignment ends, and the plaintiff will see a notice when they return.',
         label: 'Close lead', danger: true,
-        submit: () => { closeLead(actor, lead.id); view.filter = 'all'; done('Lead closed. An in-app notice was added.'); },
+        submit: () => {
+          const closed = closeLead(actor, lead.id);
+          if (!matchesSearch(closed, view.query.trim().toLowerCase())) view.query = '';
+          view.filter = 'all';
+          view.auditHighlightId = lead.id;
+          done('Lead closed. An in-app notice was added.');
+          focusAfterDialog('.audit-entry.is-audit-highlight');
+        },
       });
       break;
     case 'advance': {
@@ -417,11 +604,15 @@ document.addEventListener('click', async event => {
 document.addEventListener('change', event => {
   const target = event.target;
   if (target.matches('[data-role-switch]')) {
+    setRequestUrl(null);
     view.actor = actors.find(actor => actor.id === target.value) ?? actors[0];
     localStorage.setItem('grand-charter-actor', view.actor.id);
     resetView();
     render();
+    app.querySelector('.content').classList.add('is-navigating');
     window.scrollTo(0, 0);
+  } else if (target.matches('[data-firm-select]')) {
+    dialog.querySelector('[data-receiving-firm]').textContent = target.value ? firmName(target.value) : 'Choose a firm';
   } else if (target.matches('select[data-filter]')) {
     view[target.dataset.filter] = target.value;
     view.selected = null;
@@ -453,13 +644,12 @@ document.addEventListener('submit', async event => {
     const data = new FormData(form);
     if (form.id === 'dialog-form') {
       await dialogSubmit?.(data);
-      dialog.close();
+      await dismissDialog();
     } else {
       const fields = Object.fromEntries(data);
       const lead = submitLead(view.actor, fields, await readPdf(data.get('file')));
-      view.page = 'detail';
-      view.selected = lead.id;
-      done('Your request was submitted.');
+      showRequest(lead.id);
+      showToast('Your request was submitted.');
       window.scrollTo(0, 0);
     }
   } catch (error) {
@@ -475,6 +665,29 @@ dialog.addEventListener('close', () => {
   previewUrl = undefined;
   dialogSubmit = undefined;
 });
+dialog.addEventListener('cancel', event => {
+  event.preventDefault();
+  dismissDialog();
+});
 
 resetView();
 render();
+history.scrollRestoration = 'manual';
+const initialRequest = new URL(location.href).searchParams.get('request');
+if (initialRequest) {
+  if (view.actor.role === 'plaintiff' && getLead(view.actor, initialRequest)) showRequest(initialRequest, false);
+  else setRequestUrl(null);
+}
+
+window.addEventListener('popstate', () => {
+  if (view.actor.role !== 'plaintiff') return;
+  const id = new URL(location.href).searchParams.get('request');
+  if (id && getLead(view.actor, id)) showRequest(id, false);
+  else if (view.selected) returnToRequests();
+});
+window.addEventListener('resize', () => drawTabIndicators());
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && !dialog.open && view.actor.role === 'plaintiff' && view.selected) {
+    closeRequest();
+  }
+});

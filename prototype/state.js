@@ -204,6 +204,11 @@ function visibleLead(actor, lead) {
     notes: notesFor(actor, lead),
     audit: actor.role === "admin" ? lead.audit : [],
     notice: actor.role === "plaintiff" ? lead.notice : "",
+    latestUpdateAt: actor.role === "plaintiff"
+      ? lead.audit.find(({ title }) => [
+        "Lead accepted", "Lead assigned", "Lead reassigned", "Lead closed", "Case reassigned", "Case status changed",
+      ].includes(title))?.at
+      : undefined,
   };
 }
 

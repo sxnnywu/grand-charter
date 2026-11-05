@@ -79,18 +79,21 @@ function renderRows(ctx, isCase) {
 }
 
 function renderAudit(ctx) {
-  const { escape: e, icon, lead } = ctx;
+  const { escape: e, icon, lead, auditHighlightId } = ctx;
   const timestamp = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium", timeStyle: "short" });
   return `<section class="detail-section">
     <div class="detail-section-heading"><h3>Audit history</h3><span class="detail-section-icon">${icon("activity", 18)}</span></div>
-    ${lead.audit.length ? `<ol class="audit-list">${lead.audit.map(event => `<li class="audit-entry">
-      <span class="audit-marker" aria-hidden="true"></span>
-      <div class="audit-entry-body">
-        <strong>${e(event.title)}</strong>
-        <p>${e(event.detail)}</p>
-        <small>${e(event.actor)} <span aria-hidden="true">·</span> <time datetime="${e(event.at)}">${e(timestamp.format(new Date(event.at)))}</time></small>
-      </div>
-    </li>`).join("")}</ol>` : '<p class="detail-copy">There are no recorded changes yet.</p>'}
+    ${lead.audit.length ? `<ol class="audit-list">${lead.audit.map((event, index) => {
+      const highlighted = index === 0 && auditHighlightId === lead.id;
+      return `<li class="audit-entry${highlighted ? " is-audit-highlight" : ""}"${highlighted ? ' tabindex="-1"' : ""}>
+        <span class="audit-marker" aria-hidden="true"></span>
+        <div class="audit-entry-body">
+          <strong>${e(event.title)}</strong>
+          <p>${e(event.detail)}</p>
+          <small>${e(event.actor)} <span aria-hidden="true">·</span> <time datetime="${e(event.at)}">${e(timestamp.format(new Date(event.at)))}</time></small>
+        </div>
+      </li>`;
+    }).join("")}</ol>` : '<p class="detail-copy">There are no recorded changes yet.</p>'}
   </section>`;
 }
 
@@ -119,32 +122,80 @@ function renderDocuments(ctx, isCase) {
   </section>`;
 }
 
-function renderMeta(ctx, isAdmin) {
-  const { escape: e, date, lead, firms } = ctx;
-  const firmName = firms.find(firm => firm.id === lead.firmId)?.name;
+function renderMeta(ctx) {
+  const { escape: e, date, lead } = ctx;
   const values = [
     ["Category", lead.category],
     ["Region", lead.region],
     ["Submitted", date(lead.createdAt)],
-    ...(isAdmin ? [["Assigned firm", firmName ?? "Unassigned"]] : []),
   ];
   return `<dl class="detail-meta">${values.map(([label, value]) => `<div><dt>${label}</dt><dd>${e(value)}</dd></div>`).join("")}</dl>`;
 }
 
-function renderOverview(ctx, isAdmin, isCase) {
-  const { escape: e, icon, lead } = ctx;
+function renderNarrative(ctx, label) {
+  const { escape: e, lead } = ctx;
+  return `<section class="detail-section request-narrative">
+    <h3>${label}</h3>
+    <p class="detail-copy description">${e(lead.description)}</p>
+  </section>`;
+}
+
+function renderCaseOverview(ctx) {
+  const { icon, lead } = ctx;
   const stage = stages.findIndex(([key]) => key === lead.caseStatus);
-  return `${renderMeta(ctx, isAdmin)}
-    ${isCase ? `<section class="detail-section">
-      <h3>Case progress</h3>
-      <ol class="case-progress" aria-label="Case progress">${stages.map(([key, label], index) => `<li class="progress-step ${index < stage ? "is-complete" : index === stage ? "is-current" : ""}" ${index === stage ? 'aria-current="step"' : ""}>
-        <span class="progress-marker">${index < stage ? icon("check", 13) : index + 1}</span><span>${label}</span>
-      </li>`).join("")}</ol>
-    </section>` : ""}
-    <section class="detail-section">
-      <h3>${isCase ? "Original request" : "Request summary"}</h3>
-      <p class="detail-copy description">${e(lead.description)}</p>
-    </section>`;
+  return `<section class="detail-section">
+    <h3>Case progress</h3>
+    <ol class="case-progress" aria-label="Case progress">${stages.map(([key, label], index) => `<li class="progress-step ${index < stage ? "is-complete" : index === stage ? "is-current" : ""}" ${index === stage ? 'aria-current="step"' : ""}>
+      <span class="progress-marker">${index < stage ? icon("check", 13) : index + 1}</span><span>${label}</span>
+    </li>`).join("")}</ol>
+  </section>
+  ${renderNarrative(ctx, "Original request")}
+  ${renderMeta(ctx)}`;
+}
+
+function renderAssignment(ctx, isCase) {
+  const { escape: e, icon, firms, lead } = ctx;
+  const firm = firms.find(item => item.id === lead.firmId);
+  const options = [];
+  if (!isCase && lead.status === "declined") {
+    options.push(action(ctx, "close-lead", "Close lead", { kind: "danger", value: lead.id }));
+  }
+  if (isCase || ["pending", "review", "declined"].includes(lead.status)) {
+    options.push(action(ctx, "assign", firm ? "Reassign" : "Assign firm", {
+      kind: "primary",
+      glyph: firm ? "swap" : "building",
+      value: lead.id,
+    }));
+  }
+  return `<section class="assignment-summary" aria-label="Current assignment">
+    <span class="assignment-summary-icon">${icon("building", 19)}</span>
+    <div class="assignment-summary-copy"><small>Current assignment</small><strong>${e(firm?.name ?? "Unassigned")}</strong></div>
+    ${options.length ? `<div class="detail-actions">${options.join("")}</div>` : ""}
+  </section>`;
+}
+
+function renderReviewFooter(ctx, isAdmin) {
+  const { escape: e, lead } = ctx;
+  if (lead.caseId) {
+    return `<footer class="review-footer" data-review-state="accepted">
+      <div class="review-footer-copy"><strong>Case ${e(lead.caseId)}</strong><small>Lead accepted</small></div>
+      <div class="detail-actions">${action(ctx, "open-case", "Open case", { kind: "primary", glyph: "arrow-right", value: lead.id })}</div>
+    </footer>`;
+  }
+  if (isAdmin) return "";
+  if (lead.status === "declined") {
+    return `<footer class="review-footer" data-review-state="declined">
+      <div class="review-footer-copy"><strong>Awaiting admin review</strong><small>An admin can reassign or close this lead.</small></div>
+    </footer>`;
+  }
+  if (lead.status !== "review") return "";
+  return `<footer class="review-footer" data-review-state="review">
+    <div class="review-footer-copy"><strong>Lead decision</strong><small>Accept to open a case or decline to send it to an admin.</small></div>
+    <div class="detail-actions">
+      ${action(ctx, "decline", "Decline", { kind: "danger", value: lead.id })}
+      ${action(ctx, "accept", "Accept lead", { kind: "primary", glyph: "check", value: lead.id })}
+    </div>
+  </footer>`;
 }
 
 function renderDetail(ctx, isAdmin, isCase) {
@@ -157,24 +208,9 @@ function renderDetail(ctx, isAdmin, isCase) {
     </section>`;
   }
 
-  let actions = "";
-  if (isAdmin) {
-    if (lead.status === "declined" && !isCase) {
-      actions += action(ctx, "close-lead", "Close lead", { kind: "danger", value: lead.id });
-    }
-    if (isCase || ["pending", "review", "declined"].includes(lead.status)) {
-      actions += action(ctx, "assign", lead.firmId ? "Reassign" : "Assign firm", { kind: "primary", glyph: lead.firmId ? "swap" : "building", value: lead.id });
-    }
-  } else if (isCase && lead.caseStatus !== "closed") {
-    actions = action(ctx, "advance", lead.caseStatus === "open" ? "Start work" : "Close case", { kind: "primary", glyph: "check", value: lead.id });
-  } else if (!isCase && lead.status === "review") {
-    actions = action(ctx, "decline", "Decline", { kind: "danger", value: lead.id })
-      + action(ctx, "accept", "Accept lead", { kind: "primary", glyph: "check", value: lead.id });
-  }
-
-  if (!isCase && lead.caseId) {
-    actions += action(ctx, "open-case", "Open case", { kind: "primary", glyph: "arrow-right", value: lead.id });
-  }
+  const caseAction = !isAdmin && isCase && lead.caseStatus !== "closed"
+    ? action(ctx, "advance", lead.caseStatus === "open" ? "Start work" : "Close case", { kind: "primary", glyph: "check", value: lead.id })
+    : "";
   const tabs = isAdmin ? [["overview", "Overview"], ["notes", "Firm notes"]] : [["overview", "Overview"], ["documents", "Documents"], ["notes", "Firm notes"]];
   const activeTab = tabs.some(([key]) => key === caseTab) ? caseTab : "overview";
   let body;
@@ -184,20 +220,23 @@ function renderDetail(ctx, isAdmin, isCase) {
     } else if (activeTab === "documents") {
       body = renderDocuments(ctx, true);
     } else {
-      body = renderOverview(ctx, isAdmin, true) + (isAdmin ? renderAudit(ctx) : "");
+      body = renderCaseOverview(ctx) + (isAdmin ? renderAudit(ctx) : "");
     }
   } else {
-    body = renderOverview(ctx, isAdmin, false) + (isAdmin ? renderAudit(ctx) : renderDocuments(ctx, false));
+    body = renderNarrative(ctx, "Request summary");
+    body += isAdmin ? renderMeta(ctx) + renderAudit(ctx) : renderDocuments(ctx, false) + renderMeta(ctx);
   }
-  return `<section class="staff-detail" aria-label="${isCase ? "Case" : "Lead"} details">
+  return `<section class="staff-detail" data-record="${e(lead.id)}" aria-label="${isCase ? "Case" : "Lead"} details">
     <header class="detail-header">
       <div class="detail-breadcrumb">${icon(isCase ? "folder" : "inbox", 14)} ${isCase ? "Case" : "Lead"} ${e(isCase ? lead.caseId : lead.id)}</div>
       <div class="detail-title"><h2>${e(lead.name)}</h2>${status(isCase ? lead.caseStatus : lead.status)}</div>
       <span class="detail-contact">${icon("mail", 14)} ${e(lead.email)}</span>
-      ${actions ? `<div class="detail-actions">${actions}</div>` : ""}
+      ${caseAction ? `<div class="detail-actions">${caseAction}</div>` : ""}
     </header>
+    ${isAdmin ? renderAssignment(ctx, isCase) : ""}
     ${isCase ? `<nav class="case-tabs" aria-label="Case details">${tabs.map(([key, label]) => `<button type="button" class="staff-tab ${activeTab === key ? "is-active" : ""}" data-action="case-tab" data-value="${key}" aria-pressed="${activeTab === key}">${label}</button>`).join("")}</nav>` : ""}
     <div class="detail-body">${body}</div>
+    ${isCase ? "" : renderReviewFooter(ctx, isAdmin)}
   </section>`;
 }
 
