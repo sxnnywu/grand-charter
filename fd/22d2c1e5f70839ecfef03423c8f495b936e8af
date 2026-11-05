@@ -1,0 +1,30 @@
+docs/workflow-rules.md
+  s_079498f144b51a::t_c9b9cdfe6e8630 78-79
+docs/data-model.md
+  s_079498f144b51a::t_c9b9cdfe6e8630 56
+  s_079498f144b51a::t_4577c10dd6c80b 41
+docs/identity-and-access.md
+  s_079498f144b51a::t_f5d59be39fc505 1-4,6,14-24,27,29
+  s_079498f144b51a::t_9eba9abd22bd48 5,7-13,25-26,28
+docs/api-routes.md
+  s_079498f144b51a::t_4577c10dd6c80b 3-4,9-10
+  s_079498f144b51a::t_9acb110b5c22b2 1-2,5-8,11-41
+docs/decisions.md
+  s_079498f144b51a::t_c9b9cdfe6e8630 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fd22d2c1e5f70839ecfef03423c8f495b936e8af",
+  "prompts": {},
+  "sessions": {
+    "s_079498f144b51a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1a8ad-f620-7f02-8c39-3413c6747d65",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Sunny Wu <w.sunny0618@gmail.com>"
+    }
+  }
+}
