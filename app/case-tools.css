@@ -19,25 +19,49 @@
 }
 
 .case-upload {
+  display: grid;
+  gap: 12px;
+}
+
+.case-upload-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--canvas);
+  min-width: 0;
+}
+
+.case-upload-file > div {
+  min-width: 0;
+}
+
+.case-upload-file strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.case-upload-file small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.case-upload-controls {
   display: flex;
   flex-wrap: wrap;
-  align-items: end;
+  align-items: center;
   gap: 8px;
 }
 
-.case-upload .field {
-  flex: 1 1 13rem;
-  min-width: 0;
-}
-
-.case-upload input {
-  width: 100%;
-  min-width: 0;
-}
-
-.case-field-hint {
-  color: var(--muted);
-  font-weight: 400;
+.case-upload-controls .button {
+  min-height: 36px;
+  margin: 0;
 }
 
 .case-file-copy {
@@ -47,6 +71,12 @@
 .case-file-copy .subtle-link {
   display: block;
   overflow-wrap: anywhere;
+}
+
+.case-file-copy .subtle-link svg {
+  display: inline;
+  margin-left: 6px;
+  vertical-align: -.1em;
 }
 
 .case-file-copy small {
@@ -130,6 +160,26 @@
 .case-note-form,
 .case-upload {
   padding: 10px 0;
+}
+
+@media (max-width: 380px) {
+  .plaintiff-shell .case-progress {
+    display: grid;
+    gap: 12px;
+  }
+
+  .plaintiff-shell .case-progress .progress-step {
+    position: relative;
+  }
+
+  .plaintiff-shell .case-progress .progress-step:not(:last-child)::after {
+    position: absolute;
+    top: 100%;
+    left: 11px;
+    width: 1px;
+    height: 12px;
+    margin: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

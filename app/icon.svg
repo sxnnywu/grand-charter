@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>Brief</title>
+  <rect width="64" height="64" rx="14" fill="#35477e" />
+  <path d="M17 20h-5v34h27v-5" fill="none" stroke="#fffefa" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M23 10h17l12 12v26H23Z" fill="#fffefa" />
+  <path d="M40 10v12h12M30 30h15M30 37h15" fill="none" stroke="#35477e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+</svg>

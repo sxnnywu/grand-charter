@@ -1,0 +1,139 @@
+.shell.plaintiff-shell {
+  display: block;
+}
+
+.plaintiff-shell .main {
+  min-width: 0;
+}
+
+.plaintiff-shell .topbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 32px;
+  min-height: 80px;
+  padding: 18px max(24px, calc((100vw - 1160px) / 2));
+  background: var(--canvas);
+}
+
+.plaintiff-shell .topbar > .brand {
+  margin: 0;
+  font-size: 21px;
+}
+
+.plaintiff-navigation {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.plaintiff-navigation button {
+  padding: 8px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: color 150ms ease, border-color 150ms ease;
+}
+
+.plaintiff-navigation button[aria-current="page"] {
+  border-bottom-color: var(--indigo);
+  color: var(--indigo);
+}
+
+.plaintiff-navigation button:hover:not(:disabled) {
+  color: var(--ink);
+}
+
+.plaintiff-account-name {
+  margin-right: 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.plaintiff-shell .content {
+  width: min(100%, 1240px);
+  padding: 38px 40px 64px;
+}
+
+.plaintiff-shell > .main > dialog .dialog-footer {
+  flex-wrap: wrap;
+}
+
+.plaintiff-shell .page-heading h1 {
+  font-size: clamp(30px, 3vw, 36px);
+}
+
+.plaintiff-shell .plaintiff-home-view .bookshelf-index {
+  top: 104px;
+  max-height: calc(100dvh - 128px);
+}
+
+@media (max-width: 1080px) {
+  .plaintiff-account-name {
+    display: none;
+  }
+
+  .plaintiff-shell .topbar {
+    gap: 24px;
+  }
+}
+
+@media (max-width: 760px) {
+  .plaintiff-shell.demo-portal .topbar,
+  .plaintiff-shell.demo-portal:has(.bookshelf.has-selection) .topbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 15px 20px 0;
+  }
+
+  .plaintiff-shell .topbar > .brand {
+    flex: 1;
+    font-size: 19px;
+  }
+
+  .plaintiff-shell .topbar-actions {
+    margin-left: auto;
+    gap: 6px;
+  }
+
+  .plaintiff-navigation {
+    order: 3;
+    width: 100%;
+    gap: 24px;
+  }
+
+  .plaintiff-navigation button {
+    padding-bottom: 12px;
+  }
+
+  .plaintiff-shell .content,
+  .plaintiff-shell:has(.bookshelf.has-selection) .content {
+    padding: 25px 18px 44px;
+  }
+
+  .plaintiff-shell .plaintiff-home-view .bookshelf-index {
+    max-height: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .plaintiff-shell .topbar,
+  .plaintiff-shell.demo-portal:has(.bookshelf.has-selection) .topbar {
+    padding-inline: 14px;
+  }
+
+  .plaintiff-shell .account-trigger > span:not(.account-avatar) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plaintiff-navigation button {
+    transition: none;
+  }
+}

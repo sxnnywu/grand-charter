@@ -5,7 +5,11 @@ import { categories, regions } from "@/lib/intake-options";
 import { AdminTools, type Firm } from "./admin-tools";
 import { isAccessError, messageFor, post, request } from "./api-client";
 import { CaseTools, LeadDocuments } from "./case-tools";
+import { PlaintiffHome } from "./plaintiff-view";
+import { PlaintiffIntake, RequestSubmitted, type IntakeDraft } from "./plaintiff-intake";
+import { PlaintiffCaseDetail, PlaintiffLeadDetail, type PlaintiffCaseRecord } from "./plaintiff-records";
 import { animateWorkspace, observeScrollReveals, stopWorkspaceTransition } from "./workspace-motion";
+import "./plaintiff-shell.css";
 
 type Role = "plaintiff" | "attorney" | "paralegal" | "admin";
 type Account = { id: string; name: string; email: string; role: Role; firmName: string | null };
@@ -234,14 +238,17 @@ export function Workspace() {
           {session ? "Demo accounts ready." : sessionError ? "" : "Loading demo accounts…"}
         </p>
         <form className="form-stack" onSubmit={signIn} aria-busy={!session && !sessionError}>
-          <label className="field">Demo account
-            <select name="email" required defaultValue="" disabled={!session || !!sessionAction}>
-              <option value="" disabled>{session ? "Choose an account" : sessionError ? "Accounts unavailable" : "Loading accounts…"}</option>
-              {session?.accounts.map((account) => (
-                <option key={account.id} value={account.email}>{account.name} · {roleName(account)}</option>
-              ))}
-            </select>
-          </label>
+          <div>
+            <label className="field">Demo account
+              <select name="email" required defaultValue="" aria-describedby="demo-account-hint" disabled={!session || !!sessionAction}>
+                <option value="" disabled>{session ? "Choose an account" : sessionError ? "Accounts unavailable" : "Loading accounts…"}</option>
+                {session?.accounts.map((account) => (
+                  <option key={account.id} value={account.email}>{account.name} · {roleName(account)}</option>
+                ))}
+              </select>
+            </label>
+            <p id="demo-account-hint" className="demo-account-hint">Maya starts with requests and a case. Jordan starts with an empty workspace.</p>
+          </div>
           <button className="button primary" disabled={!!sessionAction || (!session && !sessionError) || session?.accounts.length === 0} type="submit">
             {!session && sessionError ? "Try again" : sessionAction ? "Signing in…" : "Sign in"} <Icon name="arrow" size={16} />
           </button>
@@ -331,6 +338,15 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const isAdmin = user.role === "admin";
   const home = isPlaintiff ? "My requests" : isAdmin ? "Lead queue" : "Lead inbox";
   const [composing, setComposing] = useState(false);
+  const [intakeDraft, setIntakeDraft] = useState<IntakeDraft>({ name: user.name, email, region: "", category: "", description: "" });
+  const hasIntakeDraft = isPlaintiff && (intakeDraft.name.trim() !== user.name.trim() || intakeDraft.email.trim() !== email.trim()
+    || !!intakeDraft.region || !!intakeDraft.category || !!intakeDraft.description.trim());
+  const leaveDraftDialog = useRef<HTMLDialogElement>(null);
+  const pendingAccountChange = useRef<(() => void) | undefined>(undefined);
+  const [submitted, setSubmitted] = useState<Lead>();
+  const initialRequestChecked = useRef(false);
+  const historyRevision = useRef(0);
+  const listRevision = useRef(0);
   const [leads, setLeads] = useState<Lead[]>();
   const [listError, setListError] = useState("");
   const [listAttempt, setListAttempt] = useState(0);
@@ -381,12 +397,37 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   if (query) parameters.set("q", query);
   const listUrl = `/api/${filter === "cases" ? "cases" : "leads"}?${parameters}`;
 
+  useEffect(() => {
+    if (!hasIntakeDraft) return;
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeaving);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeaving);
+  }, [hasIntakeDraft]);
+
+  function changeAccount(change: () => void) {
+    if (!hasIntakeDraft) {
+      change();
+      return;
+    }
+    pendingAccountChange.current = change;
+    leaveDraftDialog.current?.showModal();
+  }
+
+  function resetIntakeDraft() {
+    setIntakeDraft({ name: user.name, email, region: "", category: "", description: "" });
+    intakeAttempt.current = null;
+  }
+
   const onAccessLost = useCallback(() => {
     if (selectedRef.current !== selectedId) return;
     stopWorkspaceTransition();
     setSelectedId(undefined);
     setCaseId(undefined);
     setLeadResult(undefined);
+    setSubmitted(undefined);
     setChildBusy(false);
     setAction(undefined);
     setActionError("");
@@ -463,12 +504,17 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       setSelectedId(id);
       setCaseId(id ? linkedCase : undefined);
       setComposing(false);
+      setSubmitted(undefined);
       setActionError("");
       setNotice("");
       if (linkedCase) setFilter(isAdmin ? "cases" : "accepted");
     }
     restoreRecord();
-    const onHistory = () => animateWorkspace("page", restoreRecord);
+    const onHistory = () => {
+      initialRequestChecked.current = true;
+      historyRevision.current += 1;
+      animateWorkspace("page", restoreRecord);
+    };
     window.addEventListener("popstate", onHistory);
     return () => window.removeEventListener("popstate", onHistory);
   }, [isAdmin]);
@@ -487,6 +533,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
 
   useEffect(() => {
     const controller = new AbortController();
+    const revision = listRevision.current;
     setListLoading(true);
     setListError("");
     setMoreError("");
@@ -494,15 +541,15 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     setNextCursor(null);
     loadRecords(listUrl, controller.signal)
       .then(({ leads, nextCursor }) => {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || revision !== listRevision.current) return;
         setLeads(leads);
         setNextCursor(nextCursor);
       })
       .catch((error: unknown) => {
-        if (!controller.signal.aborted) setListError(messageFor(error));
+        if (!controller.signal.aborted && revision === listRevision.current) setListError(messageFor(error));
       })
       .finally(() => {
-        if (!controller.signal.aborted) setListLoading(false);
+        if (!controller.signal.aborted && revision === listRevision.current) setListLoading(false);
       });
     return () => {
       controller.abort();
@@ -510,6 +557,16 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       moreRequest.current = null;
     };
   }, [listUrl, listAttempt]);
+
+  useEffect(() => {
+    if (!isPlaintiff || !leads || listLoading || initialRequestChecked.current) return;
+    initialRequestChecked.current = true;
+    if (selectedId || composing || submitted || leads.length !== 1 || nextCursor) return;
+    const onlyRequest = leads[0];
+    setSelectedId(onlyRequest.id);
+    setCaseId(onlyRequest.caseId ?? undefined);
+    writeRecordUrl(onlyRequest.id, onlyRequest.caseId ?? undefined, true);
+  }, [isPlaintiff, leads, listLoading, selectedId, composing, submitted, nextCursor]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -523,19 +580,20 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   async function showMore() {
     if (!nextCursor || moreRequest.current) return;
     const controller = new AbortController();
+    const revision = listRevision.current;
     moreRequest.current = controller;
     setLoadingMore(true);
     setMoreError("");
     try {
       const more = await loadRecords(`${listUrl}&before=${nextCursor}`, controller.signal);
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || revision !== listRevision.current) return;
       setLeads((current) => {
         const seen = new Set(current?.map(({ id }) => id));
         return [...(current ?? []), ...more.leads.filter(({ id }) => !seen.has(id))];
       });
       setNextCursor(more.nextCursor);
     } catch (error) {
-      if (!controller.signal.aborted) setMoreError(messageFor(error));
+      if (!controller.signal.aborted && revision === listRevision.current) setMoreError(messageFor(error));
     } finally {
       if (moreRequest.current === controller) {
         moreRequest.current = null;
@@ -562,7 +620,9 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   }, [selectedId, isPlaintiff, isAdmin, onAccessLost]);
 
   function applySelection(id?: string, linkedCase?: string) {
+    initialRequestChecked.current = true;
     if (selectedId !== id) setLeadResult(undefined);
+    setSubmitted(undefined);
     setSelectedId(id);
     setCaseId(linkedCase);
     setActionError("");
@@ -586,9 +646,9 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   }
 
   function showIntake(show: boolean) {
-    if (show === composing && !selectedId) return;
+    initialRequestChecked.current = true;
+    if (show === composing && !selectedId && !submitted) return;
     animateWorkspace("page", () => {
-      intakeAttempt.current = null;
       applySelection();
       setComposing(show);
       window.scrollTo(0, 0);
@@ -599,6 +659,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     event.preventDefault();
     if (mutationBusy.current || accessBlocked.current) return;
     mutationBusy.current = true;
+    const submittedAtHistory = historyRevision.current;
     const form = new FormData(event.currentTarget);
     setActionError("");
     setAction("submit");
@@ -613,12 +674,19 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       const { lead: created } = await post<{ lead: Lead }>("/api/leads", input, {
         "Idempotency-Key": intakeAttempt.current.key,
       });
-      intakeAttempt.current = null;
+      resetIntakeDraft();
+      // A list response from before this write must not replace the new request.
+      listRevision.current += 1;
       setLeads((current) => [created, ...(current ?? []).filter(({ id }) => id !== created.id)]);
+      setListAttempt((current) => current + 1);
+      if (submittedAtHistory !== historyRevision.current) {
+        setNotice("Your request was submitted. You can find it in My requests.");
+        return;
+      }
       applySelection(created.id);
       setLeadResult({ id: created.id, lead: created });
       setComposing(false);
-      setNotice("Your request was submitted.");
+      setSubmitted(created);
     } catch (error) {
       setActionError(messageFor(error));
     } finally {
@@ -668,6 +736,13 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     setLeads((current) => current?.map((item) => item.id === updated.id ? updated : item));
   }
 
+  const updatePlaintiffCase = useCallback((item: PlaintiffCaseRecord) => {
+    const update = (current: Lead): Lead => current.id === item.leadId && current.caseId === item.id
+      ? { ...current, caseStatus: item.status, firmName: item.firmName } : current;
+    setLeadResult((current) => current && "lead" in current ? { ...current, lead: update(current.lead) } : current);
+    setLeads((current) => current?.map(update));
+  }, []);
+
   const pagination = nextCursor || moreError ? (
     <div className="queue-pagination">
       {moreError && <Message error>{moreError}</Message>}
@@ -678,13 +753,19 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   ) : null;
 
   const record = selectedId ? (
-    caseId && lead?.caseId === caseId ?
+    caseId && lead?.caseId === caseId ? (
+      isPlaintiff ? <PlaintiffCaseDetail key={caseId} id={caseId} lead={lead} back={() => selectCase()}
+        locked={acting} onBusyChange={setChildBusy} onAccessLost={onAccessLost} onLoaded={updatePlaintiffCase}
+        refreshVersion={refreshVersion} /> :
       <CaseDetail key={caseId} id={caseId} lead={lead} back={() => selectCase()} role={user.role}
         locked={acting} onBusyChange={setChildBusy} onStatusChange={updateCaseStatus}
         onAccessLost={onAccessLost} refreshVersion={refreshVersion}
         adminTools={isAdmin ? <AdminTools lead={lead} caseView firms={firms} onUpdated={updateAssignment}
-          onBusyChange={setChildBusy} onAccessLost={onAccessLost} refreshVersion={refreshVersion} /> : undefined} /> :
+          onBusyChange={setChildBusy} onAccessLost={onAccessLost} refreshVersion={refreshVersion} /> : undefined} />
+    ) :
     lead ? (
+      isPlaintiff ? <PlaintiffLeadDetail key={lead.id} lead={lead} close={() => select()} openCase={selectCase}
+        locked={acting} onBusyChange={setChildBusy} onAccessLost={onAccessLost} refreshVersion={refreshVersion} /> :
       <LeadDetail key={lead.id} lead={lead} plaintiff={isPlaintiff} admin={isAdmin}
         decision={action === "submit" ? undefined : action} decideLead={decideLead}
         actionError={actionError} close={() => select()} openCase={selectCase} locked={acting}
@@ -708,8 +789,8 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   );
 
   return (
-    <div className="shell demo-portal">
-      <aside className="sidebar" aria-label="Workspace">
+    <div className={`shell demo-portal${isPlaintiff ? " plaintiff-shell" : ""}`}>
+      {!isPlaintiff && <aside className="sidebar" aria-label="Workspace">
         <Brand />
         <div className="workspace-label">Workspace</div>
         <nav className="nav-list" aria-label="Main navigation">
@@ -728,16 +809,25 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
             <div><strong>{user.name}</strong><small>{roleName(user)}</small></div>
           </div>
         </div>
-      </aside>
+      </aside>}
       <main className="main">
         <header className="topbar">
-          <div className="breadcrumbs"><span>{roleName(user)}</span><Icon name="chevron" size={13} />
+          {isPlaintiff ? <>
+            <Brand />
+            <nav className="plaintiff-navigation" aria-label="Main navigation">
+              <button type="button" aria-current={!composing ? "page" : undefined}
+                disabled={acting || !!sessionAction} onClick={() => showIntake(false)}>My requests</button>
+              <button type="button" aria-current={composing ? "page" : undefined}
+                disabled={!leads || acting || !!sessionAction} onClick={() => showIntake(true)}>{hasIntakeDraft ? "Continue request" : "New request"}</button>
+            </nav>
+          </> : <div className="breadcrumbs"><span>{roleName(user)}</span><Icon name="chevron" size={13} />
             <strong>{composing ? "Submit a request" : home}</strong>
-          </div>
+          </div>}
           <div className="topbar-actions">
+            {isPlaintiff && <span className="plaintiff-account-name">{user.name}</span>}
             <AccountSwitcher user={user} accounts={accounts} disabled={acting || !!sessionAction}
-              switching={sessionAction === "switch"} onSwitch={switchAccount} />
-            <button className="button small" onClick={signOut} disabled={!!sessionAction || acting}>
+              switching={sessionAction === "switch"} onSwitch={(email) => changeAccount(() => switchAccount(email))} />
+            <button className="button small" onClick={() => changeAccount(signOut)} disabled={!!sessionAction || acting}>
               {sessionAction === "sign-out" ? "Signing out…" : "Sign out"}
             </button>
           </div>
@@ -749,19 +839,25 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
           {accessError && <Message error>{accessError}{" "}
             <button className="subtle-link" onClick={() => recheckAccess.current()}>Try again</button>
           </Message>}
-          <div className="portal-page" key={composing ? "intake" : "list"} inert={accessChecking || !!accessError}>
-            {composing ? (
-              <Intake name={user.name} email={email} submit={submitLead} cancel={() => showIntake(false)}
+          <div className="portal-page" key={submitted ? "confirmation" : composing ? "intake" : "list"} inert={accessChecking || !!accessError}>
+            {submitted ? (
+              <RequestSubmitted lead={submitted} onView={() => animateWorkspace("page", () => {
+                setSubmitted(undefined);
+                window.scrollTo(0, 0);
+              })} />
+            ) : composing ? (
+              <PlaintiffIntake draft={intakeDraft} hasDraft={hasIntakeDraft} updateDraft={setIntakeDraft}
+                discardDraft={() => {
+                  resetIntakeDraft();
+                  showIntake(false);
+                }} submit={submitLead} cancel={() => showIntake(false)}
                 submitting={acting} error={actionError} />
             ) : (
-              <div className={isPlaintiff ? "plaintiff-home" : undefined}>
-                <header className="page-heading split-heading">
-                  <div><h1 tabIndex={-1} ref={focusHeading}>{home}</h1><p>{isPlaintiff ? "Track your requests and open your cases." :
+              <div>
+                {!isPlaintiff && <header className="page-heading split-heading">
+                  <div><h1 tabIndex={-1} ref={focusHeading}>{home}</h1><p>{
                     isAdmin ? "Find leads and cases across firms, and manage their assignments." : "Review new leads assigned to your firm."}</p></div>
-                  {isPlaintiff && <button className="button primary" onClick={() => showIntake(true)} disabled={!leads || acting}>
-                    <Icon name="plus" size={16} />Submit a request
-                  </button>}
-                </header>
+                </header>}
                 {!isPlaintiff && <div className="queue-filters">
                   {isAdmin ? (
                     <>
@@ -810,29 +906,9 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
                 </Message>}
                 {(!listError || leads !== undefined) && (
                   isPlaintiff ? (
-                    !leads ? <Message>Loading requests…</Message> :
-                    <div className={`bookshelf${selectedId ? " has-selection" : ""}`}>
-                      <section className="bookshelf-index request-list" aria-labelledby="requests-heading">
-                        <div className="card-heading"><h2 id="requests-heading">All requests</h2></div>
-                        {leads.length ? leads.map((item) => (
-                          <button key={item.id} className="request-card" data-reveal="" aria-pressed={selectedId === item.id}
-                            disabled={acting} onClick={() => select(item.id)}>
-                            <span className="request-icon"><Icon name="file" /></span>
-                            <span className="request-copy">
-                              <strong className="request-title">{requestTitle(item)}</strong>
-                              <small>{item.category} · {dateFormat.format(new Date(item.createdAt))}</small>
-                              <span className="request-meta"><Badge status={item.status}
-                                label={item.status === "declined" ? "Awaiting admin review" : undefined} /></span>
-                              {item.latestNotice && <small className="plaintiff-notice-preview">{item.latestNotice.message}</small>}
-                            </span>
-                            <Icon name="chevron" size={16} />
-                          </button>
-                        )) : <p className="empty">You haven’t submitted a request yet.</p>}
-                        {pagination}
-                      </section>
-                      {(leads.length > 0 || selectedId) && <section className="bookshelf-reading workspace-record"
-                        aria-label="Request details" key={selectedId}>{record}</section>}
-                    </div>
+                    <PlaintiffHome leads={leads} loading={listLoading} selectedId={selectedId} record={record}
+                      onSelect={select} onStart={() => showIntake(true)} locked={acting} pagination={pagination}
+                      firstName={user.name.trim().split(/\s+/)[0]} hasDraft={hasIntakeDraft} />
                   ) : (
                     <StaffList leads={leads ?? []} selectedId={selectedId} select={select} admin={isAdmin} filter={filter}
                       loading={listLoading} pagination={pagination}
@@ -846,51 +922,21 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
             )}
           </div>
         </div>
+        {isPlaintiff && <dialog ref={leaveDraftDialog} aria-labelledby="leave-draft-title" aria-describedby="leave-draft-description"
+          onClose={() => { pendingAccountChange.current = undefined; }}>
+          <div className="dialog-head"><h2 id="leave-draft-title">Leave this account?</h2></div>
+          <div className="dialog-body"><p id="leave-draft-description">You have an unfinished request. Leaving this account will discard its draft.</p></div>
+          <form method="dialog" className="dialog-footer">
+            <button className="button" type="submit">Stay here</button>
+            <button className="button primary danger" type="button" onClick={() => {
+              const change = pendingAccountChange.current;
+              leaveDraftDialog.current?.close();
+              change?.();
+            }}>Discard and leave</button>
+          </form>
+        </dialog>}
       </main>
     </div>
-  );
-}
-
-function Intake({ name, email, submit, cancel, submitting, error }: {
-  name: string; email: string; submit: (event: FormEvent<HTMLFormElement>) => void;
-  cancel: () => void; submitting: boolean; error: string;
-}) {
-  return (
-    <>
-      <button className="subtle-link" onClick={cancel} disabled={submitting}><Icon name="back" size={16} />My requests</button>
-      <header className="page-heading"><h1 tabIndex={-1} ref={focusHeading}>Submit a request</h1><p>Tell us about your situation so we can match you with a firm.</p></header>
-      <div className="plaintiff-grid">
-        <form className="panel detail-card form-stack" onSubmit={submit}>
-          <div className="card-heading"><h2>Request details</h2></div>
-          <div className="form-grid">
-            <label className="field">Full name<input name="name" autoComplete="name" defaultValue={name} required maxLength={100} /></label>
-            <label className="field">Email address<input type="email" name="email" autoComplete="email" defaultValue={email} required maxLength={180} /></label>
-            <label className="field">Region<select name="region" required defaultValue="">
-              <option value="" disabled>Select a region</option>{regions.map((region) => <option key={region}>{region}</option>)}
-            </select></label>
-            <label className="field">Category<select name="category" required defaultValue="">
-              <option value="" disabled>Select a category</option>{categories.map((category) => <option key={category}>{category}</option>)}
-            </select></label>
-          </div>
-          <label className="field">What happened?
-            <textarea name="description" rows={5} required maxLength={2500}
-              placeholder="Briefly describe what happened and what you need help with." />
-          </label>
-          {error && <Message error>{error}</Message>}
-          <div className="detail-actions">
-            <button className="button" type="button" onClick={cancel} disabled={submitting}>Cancel</button>
-            <button className="button primary" type="submit" disabled={submitting}>
-              {submitting ? "Submitting…" : "Submit request"} <Icon name="arrow" size={16} />
-            </button>
-          </div>
-        </form>
-        <aside className="panel demo-guide">
-          <div className="intake-folio"><span className="brand-mark"><Icon name="folio" size={23} /></span>Brief</div>
-          <h2>Try a routed request</h2>
-          <p className="notice">Choose Ontario and Employment to send your request to Northline Legal.</p>
-        </aside>
-      </div>
-    </>
   );
 }
 

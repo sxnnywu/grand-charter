@@ -15,6 +15,8 @@ type DocumentRecord = {
   uploaderName: string;
   createdAt: string;
   size: number;
+  uploadedByYou: boolean;
+  sharingFirmName: string | null;
 };
 
 type FirmNote = {
@@ -43,6 +45,25 @@ const maxNoteLength = 2000;
 
 function formatDate(value: string) {
   return dateTime.format(new Date(value));
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function uploadError(file: File) {
+  if (!/\.pdf$/i.test(file.name)) return "Choose a PDF file.";
+  if (!file.size) return "Choose a PDF that isn't empty.";
+  if (file.size > maxPdfBytes) return "Choose a PDF that is 10 MB or smaller.";
+  return "";
+}
+
+function documentSource(document: DocumentRecord, role: Role) {
+  if (document.uploadedByYou) return "Uploaded by you";
+  if (document.sharingFirmName) return `Shared by ${document.sharingFirmName}`;
+  return role === "plaintiff" ? `Uploaded by ${document.uploaderName}` : `Uploaded by the plaintiff · ${document.uploaderName}`;
 }
 
 function jsonRequest(method: "POST" | "PATCH", body: Record<string, string>, key?: string): RequestInit {
@@ -184,6 +205,7 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
   const records = useRecords<DocumentRecord>(path, "documents", onAccessLost, refreshVersion);
   const { items, error, loading, retry } = records;
   const [saving, setSaving] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File>();
   const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
   const fileInput = useRef<HTMLInputElement>(null);
   const pendingUpload = useRef<{ file: File; key: string } | undefined>(undefined);
@@ -191,10 +213,11 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (disabled || saving || !items) return;
-    const file = fileInput.current?.files?.[0];
+    const file = selectedFile;
     if (!file) return;
-    if (file.size > maxPdfBytes) {
-      setFeedback({ error: "Choose a PDF that is 10 MB or smaller." });
+    const invalid = uploadError(file);
+    if (invalid) {
+      setFeedback({ error: invalid });
       return;
     }
     setSaving(true);
@@ -210,7 +233,8 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
       pendingUpload.current = undefined;
       records.refreshFirstPage();
       if (fileInput.current) fileInput.current.value = "";
-      setFeedback({ notice: "PDF uploaded." });
+      setSelectedFile(undefined);
+      setFeedback({ notice: `${file.name} uploaded.` });
     } catch (failure) {
       if (isAccessError(failure) && onAccessLost) onAccessLost();
       else setFeedback({ error: messageFor(failure) });
@@ -221,20 +245,36 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
   }
 
   return (
-    <section className="detail-section case-tool" aria-label="PDFs">
+    <section className="detail-section case-tool" aria-label={role === "plaintiff" ? "Documents" : "PDFs"}>
       <div>
-        <h3>PDFs</h3>
+        <h3>{role === "plaintiff" ? "Documents" : "PDFs"}</h3>
         <p className="detail-copy">{role === "plaintiff" ? "Documents you upload and PDFs the firm shares with you."
           : "Plaintiff uploads and PDFs shared by your firm."}</p>
+        {role === "plaintiff" && canUpload && <p className="detail-copy">Supporting PDFs are optional. The firm handling your request can view the PDFs you upload.</p>}
       </div>
       {canUpload && items && (
-        <form className="case-upload" onSubmit={upload}>
-          <label className="field">
-            <span>Choose a PDF <span className="case-field-hint">(up to 10 MB)</span></span>
-            <input ref={fileInput} type="file" name="file" accept="application/pdf,.pdf" required disabled={disabled || saving}
-              onChange={() => setFeedback({})} />
-          </label>
-          <button className="button small" type="submit" disabled={disabled || saving}>{saving ? "Uploading…" : "Upload PDF"}</button>
+        <form className="case-upload" onSubmit={upload} aria-busy={saving}>
+          <input ref={fileInput} type="file" name="file" accept="application/pdf,.pdf" hidden disabled={disabled || saving}
+            onChange={(event) => {
+              const chosen = event.target.files?.[0];
+              setSelectedFile(chosen);
+              setFeedback(chosen ? { error: uploadError(chosen) } : {});
+            }} />
+          <div className="case-upload-file" aria-live="polite">
+            <span className="document-icon"><DocumentIcon /></span>
+            <div>
+              <strong>{selectedFile?.name ?? "No PDF selected"}</strong>
+              <small>{selectedFile ? `${formatFileSize(selectedFile.size)} · ${saving ? "Uploading…" : "Selected, not uploaded"}` : "PDF only, up to 10 MB"}</small>
+            </div>
+          </div>
+          <div className="case-upload-controls">
+            <button className="button small" type="button" disabled={disabled || saving} onClick={() => fileInput.current?.click()}>
+              {selectedFile ? "Change PDF" : "Add a PDF"}
+            </button>
+            <button className="button small" type="submit" disabled={disabled || saving || !selectedFile || !!uploadError(selectedFile)}>
+              {saving ? "Uploading…" : "Upload PDF"}
+            </button>
+          </div>
         </form>
       )}
       <Feedback {...feedback} />
@@ -246,9 +286,11 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
                 <span className="document-icon"><DocumentIcon /></span>
                 <div className="case-file-copy">
                   <a className="subtle-link" href={`/api/documents/${document.id}`} target="_blank" rel="noopener">
-                    {document.fileName}
+                    {document.fileName}<svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
+                      <path d="M14 4h6v6m0-6L10 14M10 4H4v16h16v-6" />
+                    </svg><span className="visually-hidden"> (opens in a new tab)</span>
                   </a>
-                  <small>{document.uploaderName} · <time dateTime={document.createdAt}>{formatDate(document.createdAt)}</time></small>
+                  <small>{documentSource(document, role)} · {formatFileSize(document.size)} · <time dateTime={document.createdAt}>{formatDate(document.createdAt)}</time></small>
                 </div>
               </li>
             ))}
@@ -389,7 +431,7 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
       <section className="detail-section case-tool" aria-label="Case progress">
         <div>
           <h3>Case progress</h3>
-          <p className="detail-copy">{statusCopy[status]}</p>
+          {role !== "plaintiff" && <p className="detail-copy">{statusCopy[status]}</p>}
         </div>
         <ol className="case-progress">
           {stages.map((stage, index) => (
