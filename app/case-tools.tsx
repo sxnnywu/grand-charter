@@ -57,33 +57,80 @@ function useRecords<T>(path: string, field: "documents" | "notes", onAccessLost?
   const [items, setItems] = useState<T[]>();
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [page, setPage] = useState(0);
+  const [cursors, setCursors] = useState<(string | undefined)[]>([undefined]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const accessLost = useRef(onAccessLost);
   accessLost.current = onAccessLost;
+  const before = cursors[page];
 
   useEffect(() => {
     const controller = new AbortController();
-    request<Record<string, T[]>>(path, { signal: controller.signal })
-      .then((result) => { if (!controller.signal.aborted) setItems(result[field]); })
+    setLoading(true);
+    setError("");
+    const pagePath = before ? `${path}?before=${encodeURIComponent(before)}` : path;
+    request<{ documents?: T[]; notes?: T[]; nextCursor: string | null }>(pagePath, { signal: controller.signal })
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        setItems(result[field] ?? []);
+        setNextCursor(result.nextCursor);
+      })
       .catch((failure: unknown) => {
         if (controller.signal.aborted) return;
         if (isAccessError(failure) && accessLost.current) {
           setItems(undefined);
           accessLost.current();
         } else setError(messageFor(failure));
-      });
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     return () => controller.abort();
-  }, [path, field, attempt, refreshVersion]);
+  }, [path, field, before, attempt, refreshVersion]);
 
   function retry() {
     setError("");
     setAttempt((current) => current + 1);
   }
 
-  function add(item: T) {
-    setItems((current) => [item, ...(current ?? [])]);
+  function refreshFirstPage() {
+    setLoading(true);
+    setPage(0);
+    setCursors([undefined]);
+    retry();
   }
 
-  return { items, error, retry, add };
+  function next() {
+    if (!nextCursor || loading) return;
+    setLoading(true);
+    setCursors((current) => [...current.slice(0, page + 1), nextCursor]);
+    setPage((current) => current + 1);
+  }
+
+  function previous() {
+    if (page > 0 && !loading) {
+      setLoading(true);
+      setPage((current) => current - 1);
+    }
+  }
+
+  return { items, error, loading, retry, refreshFirstPage, page, next, previous, hasNext: !!nextCursor };
+}
+
+function RecordPagination({ records, label, disabled }: {
+  records: { page: number; loading: boolean; hasNext: boolean; next: () => void; previous: () => void };
+  label: string;
+  disabled: boolean;
+}) {
+  if (records.page === 0 && !records.hasNext) return null;
+  return (
+    <nav className="case-pagination" aria-label={label}>
+      <button className="button small" type="button" disabled={disabled || records.loading || records.page === 0}
+        onClick={records.previous}>Previous page</button>
+      <span role="status">Page {records.page + 1}</span>
+      <button className="button small" type="button" disabled={disabled || records.loading || !records.hasNext}
+        onClick={records.next}>Next page</button>
+    </nav>
+  );
 }
 
 function Feedback({ error, notice }: { error?: string; notice?: string }) {
@@ -134,7 +181,8 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
   refreshVersion?: number;
 }) {
   const path = `/api/leads/${leadId}/documents`;
-  const { items, error, retry, add } = useRecords<DocumentRecord>(path, "documents", onAccessLost, refreshVersion);
+  const records = useRecords<DocumentRecord>(path, "documents", onAccessLost, refreshVersion);
+  const { items, error, loading, retry } = records;
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
   const fileInput = useRef<HTMLInputElement>(null);
@@ -156,11 +204,11 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
       const body = new FormData();
       body.set("file", file);
       if (pendingUpload.current?.file !== file) pendingUpload.current = { file, key: crypto.randomUUID() };
-      const { document } = await request<{ document: DocumentRecord }>(path, {
+      await request<{ document: DocumentRecord }>(path, {
         method: "POST", headers: { "Idempotency-Key": pendingUpload.current.key }, body,
       });
       pendingUpload.current = undefined;
-      add(document);
+      records.refreshFirstPage();
       if (fileInput.current) fileInput.current.value = "";
       setFeedback({ notice: "PDF uploaded." });
     } catch (failure) {
@@ -179,7 +227,7 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
         <p className="detail-copy">{role === "plaintiff" ? "Documents you upload and PDFs the firm shares with you."
           : "Plaintiff uploads and PDFs shared by your firm."}</p>
       </div>
-      {error ? <LoadError error={error} retry={retry} /> : !items ? <p className="detail-copy" role="status">Loading PDFs…</p> :
+      {error ? <LoadError error={error} retry={retry} /> : loading || !items ? <p className="detail-copy" role="status">Loading PDFs…</p> :
         items.length ? (
           <ul className="file-list">
             {items.map((document) => (
@@ -205,6 +253,7 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
         </form>
       )}
       <Feedback {...feedback} />
+      {!error && <RecordPagination records={records} label="PDF pages" disabled={disabled || saving} />}
     </section>
   );
 }
@@ -218,7 +267,8 @@ function Notes({ caseId, canWrite, disabled, onBusyChange, onAccessLost, refresh
   refreshVersion?: number;
 }) {
   const path = `/api/cases/${caseId}/notes`;
-  const { items, error, retry, add } = useRecords<FirmNote>(path, "notes", onAccessLost, refreshVersion);
+  const records = useRecords<FirmNote>(path, "notes", onAccessLost, refreshVersion);
+  const { items, error, loading, retry } = records;
   const [saving, setSaving] = useState(false);
   const [body, setBody] = useState("");
   const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
@@ -233,9 +283,9 @@ function Notes({ caseId, canWrite, disabled, onBusyChange, onAccessLost, refresh
     try {
       const text = body.trim();
       if (pendingNote.current?.body !== text) pendingNote.current = { body: text, key: crypto.randomUUID() };
-      const { note } = await request<{ note: FirmNote }>(path, jsonRequest("POST", { body: text }, pendingNote.current.key));
+      await request<{ note: FirmNote }>(path, jsonRequest("POST", { body: text }, pendingNote.current.key));
       pendingNote.current = undefined;
-      add(note);
+      records.refreshFirstPage();
       setBody("");
       setFeedback({ notice: "Private note added." });
     } catch (failure) {
@@ -253,7 +303,7 @@ function Notes({ caseId, canWrite, disabled, onBusyChange, onAccessLost, refresh
         <h3>Firm-private notes</h3>
         <p className="detail-copy">Notes stay with the firm that wrote them. Authorized admins can review them.</p>
       </div>
-      {error ? <LoadError error={error} retry={retry} /> : !items ? <p className="detail-copy" role="status">Loading notes…</p> :
+      {error ? <LoadError error={error} retry={retry} /> : loading || !items ? <p className="detail-copy" role="status">Loading notes…</p> :
         items.length ? (
           <ul className="note-list">
             {items.map((note) => (
@@ -280,6 +330,7 @@ function Notes({ caseId, canWrite, disabled, onBusyChange, onAccessLost, refresh
         </form>
       )}
       <Feedback {...feedback} />
+      {!error && <RecordPagination records={records} label="Private note pages" disabled={disabled || saving} />}
     </section>
   );
 }

@@ -22,22 +22,29 @@ function documentViewer(user: User) {
   }
 }
 
-export async function listDocuments(user: User, leadId: string) {
+export async function listDocuments(user: User, leadId: string, before?: string) {
   documentViewer(user);
   if (!isUuid(leadId)) throw new RequestError(404, "Lead not found.");
+  if (before !== undefined && !isUuid(before)) throw new RequestError(400, "Invalid page cursor.");
 
   const { rows } = await db().query(
     `SELECT d.id, d.file_name AS "fileName", u.name AS "uploaderName",
             d.size_bytes AS size, d.created_at AS "createdAt"
      FROM leads l
      LEFT JOIN documents d ON d.lead_id = l.id AND ${visibleDocument}
+       AND ($4::uuid IS NULL OR (d.created_at, d.id) < (
+         SELECT p.created_at, p.id FROM documents p
+         WHERE p.id = $4 AND p.lead_id = l.id
+           AND ($2::uuid IS NULL OR p.sharing_firm_id IS NULL OR p.sharing_firm_id = $2)
+       ))
      LEFT JOIN users u ON u.id = d.uploader_user_id
      WHERE l.id = $1 AND ${visibleLead}
-     ORDER BY d.created_at DESC, d.id DESC`,
-    [leadId, user.firmId, user.id],
+     ORDER BY d.created_at DESC, d.id DESC LIMIT 26`,
+    [leadId, user.firmId, user.id, before ?? null],
   );
   if (!rows.length) throw new RequestError(404, "Lead not found.");
-  return rows.filter((document) => document.id !== null);
+  const documents = rows.filter((document) => document.id !== null);
+  return { documents: documents.slice(0, 25), nextCursor: documents.length > 25 ? documents[24].id as string : null };
 }
 
 async function readPdfUpload(request: Request) {

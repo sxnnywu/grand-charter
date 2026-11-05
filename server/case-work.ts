@@ -50,24 +50,30 @@ export async function updateCaseStatus(user: User, caseId: string, status: unkno
   });
 }
 
-export async function listCaseNotes(user: User, caseId: string) {
+export async function listCaseNotes(user: User, caseId: string, before?: string) {
   const isAdmin = user.role === "admin";
   if (!isAdmin && !isFirmStaff(user)) throw new RequestError(403, "This view is for firm staff and admins.");
   if (!isUuid(caseId)) throw new RequestError(404, "Case not found.");
+  if (before !== undefined && !isUuid(before)) throw new RequestError(400, "Invalid page cursor.");
 
   const { rows } = await db().query(
     `SELECT n.id, n.body, u.name AS "authorName", f.name AS "firmName", n.created_at AS "createdAt"
      FROM cases c
      JOIN leads l ON l.id = c.lead_id
      LEFT JOIN firm_notes n ON n.case_id = c.id AND ($2 OR n.firm_id = $3)
+       AND ($4::uuid IS NULL OR (n.created_at, n.id) < (
+         SELECT p.created_at, p.id FROM firm_notes p
+         WHERE p.id = $4 AND p.case_id = c.id AND ($2 OR p.firm_id = $3)
+       ))
      LEFT JOIN users u ON u.id = n.author_user_id
      LEFT JOIN firms f ON f.id = n.firm_id
      WHERE c.id = $1 AND ($2 OR l.firm_id = $3)
-     ORDER BY n.created_at DESC, n.id DESC`,
-    [caseId, isAdmin, user.firmId],
+     ORDER BY n.created_at DESC, n.id DESC LIMIT 26`,
+    [caseId, isAdmin, user.firmId, before ?? null],
   );
   if (!rows.length) throw new RequestError(404, "Case not found.");
-  return rows.filter((note) => note.id !== null);
+  const notes = rows.filter((note) => note.id !== null);
+  return { notes: notes.slice(0, 25), nextCursor: notes.length > 25 ? notes[24].id as string : null };
 }
 
 export async function addCaseNote(user: User, caseId: string, body: unknown, key: string) {
