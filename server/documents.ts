@@ -29,6 +29,7 @@ export async function listDocuments(user: User, leadId: string, before?: string)
 
   const { rows } = await db().query(
     `SELECT d.id, d.file_name AS "fileName", u.name AS "uploaderName",
+            d.uploader_user_id = $3 AS "uploadedByYou", f.name AS "sharingFirmName",
             d.size_bytes AS size, d.created_at AS "createdAt"
      FROM leads l
      LEFT JOIN documents d ON d.lead_id = l.id AND ${visibleDocument}
@@ -38,6 +39,7 @@ export async function listDocuments(user: User, leadId: string, before?: string)
            AND ($2::uuid IS NULL OR p.sharing_firm_id IS NULL OR p.sharing_firm_id = $2)
        ))
      LEFT JOIN users u ON u.id = d.uploader_user_id
+     LEFT JOIN firms f ON f.id = d.sharing_firm_id
      WHERE l.id = $1 AND ${visibleLead}
      ORDER BY d.created_at DESC, d.id DESC LIMIT 26`,
     [leadId, user.firmId, user.id, before ?? null],
