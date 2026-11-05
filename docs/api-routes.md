@@ -45,4 +45,6 @@ The UI and API live in one Next.js app. Pages and API routes use the same server
 
 Lead and case lists return up to 50 records and a cursor for the next page. Admins can search by plaintiff name or record ID and filter by firm. A plaintiff's lead details include their assignment and closure notices.
 
+Creating a lead requires a UUID in the `Idempotency-Key` header. Keep the same key when retrying the same submission. The server returns the original result with status `201`; reusing that key with different input returns `409`. Keys are scoped to the user and operation, stored with the write in one transaction, and retained until the demo database is reset. Failed transactions can be retried with the same key. The UI keeps a pending key while its form stays open; refreshing or leaving the form starts a new attempt.
+
 See the [workflow rules](workflow-rules.md) for allowed transitions and record visibility, and [identity and access](identity-and-access.md) for how the server checks each request.

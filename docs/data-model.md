@@ -18,6 +18,7 @@ erDiagram
     LEADS ||--o{ AUDIT_EVENTS : records
     USERS o|--o{ AUDIT_EVENTS : acts
     LEADS ||--o{ PLAINTIFF_NOTICES : has
+    USERS ||--o{ IDEMPOTENCY_REQUESTS : submits
 ```
 
 ## Records
@@ -35,6 +36,7 @@ These are the logical fields we need for the workflows.
 | `routing_rules` | <ul><li>Category</li><li>Region</li><li>Destination firm ID. The proposed seed data has one destination per category and region pair.</li></ul> |
 | `audit_events` | <ul><li>ID</li><li>Lead ID. Case events appear in the history of the linked lead.</li><li>Event type</li><li>Actor user ID or System</li><li>Timestamp</li><li>Relevant before and after values</li></ul> |
 | `plaintiff_notices` | <ul><li>ID</li><li>Lead ID. The lead identifies the recipient.</li><li>Message. Plaintiffs can see the reassignment or closure notice when they return.</li><li>Creation time</li></ul> |
+| `idempotency_requests` | <ul><li>User ID, operation, and request key form the unique key.</li><li>Input hash</li><li>Original response</li><li>Creation time</li></ul> |
 
 ## How the model handles changes
 
@@ -54,5 +56,6 @@ These are the logical fields we need for the workflows.
 | Seeded routing by category and region | Gives each pair a predictable destination. Supporting multiple eligible firms would require a selection policy such as priority or round-robin. |
 | Current state with append-only audit events | The app reads current state directly and admins can inspect changes in order. Each workflow action must write its audit event alongside the update. Full snapshots would use more storage, and event sourcing would add event replay and versioning. |
 | Separate plaintiff notices | Keeps plaintiff-facing messages easy to query and gives them a separate access rule from the admin audit history. Each action that requires a notice writes one alongside the audit event. |
+| Idempotency keys for lead creation | A retry returns the saved result without creating a duplicate. Concurrent requests with the same key wait for the first transaction. Keeping results until the demo database is reset uses storage and avoids a retry window that could expire. |
 
 The [decision log](decisions.md) tracks remaining product questions, including case reopening and routing tie-breaks.

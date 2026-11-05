@@ -2,6 +2,7 @@ import { categories, regions } from "@/lib/intake-options";
 import type { PoolClient } from "pg";
 import { db, transaction } from "./db";
 import { isUuid, RequestError } from "./http";
+import { idempotent, requestHash } from "./idempotency";
 import type { User } from "./session";
 
 const leadColumns = `
@@ -121,7 +122,7 @@ function requiredText(value: unknown, label: string, max: number) {
   return value.trim();
 }
 
-export async function submitLead(user: User, body: Record<string, unknown>) {
+export async function submitLead(user: User, body: Record<string, unknown>, key: string) {
   if (user.role !== "plaintiff") throw new RequestError(403, "Only plaintiffs can submit a lead.");
   const name = requiredText(body.name, "name", 120);
   const email = requiredText(body.email, "valid email address", 254);
@@ -135,7 +136,8 @@ export async function submitLead(user: User, body: Record<string, unknown>) {
   }
   const description = requiredText(body.description, "description", 5_000);
 
-  const id = await transaction(async (client) => {
+  const hash = requestHash({ name, email, category, region, description });
+  return transaction((client) => idempotent(client, user.id, "lead.create", key, hash, async () => {
     const route = await client.query<{ firm_id: string }>(
       "SELECT firm_id FROM routing_rules WHERE category = $1 AND region = $2",
       [category, region],
@@ -154,9 +156,9 @@ export async function submitLead(user: User, body: Record<string, unknown>) {
         [leadId, { firmId, status }],
       );
     }
-    return leadId;
-  });
-  return getLead(user, id);
+    const { rows: [lead] } = await client.query(`${leadDetails} WHERE l.id = $1`, [leadId]);
+    return { ...lead, notices: [] };
+  }));
 }
 
 function reviewLead<T>(
