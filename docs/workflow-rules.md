@@ -75,8 +75,8 @@ Attorneys and paralegals have the same firm permissions. **Assigned firm** means
 | --- | --- | --- | --- | --- |
 | Lead | Submit and view own leads | View while assigned. Accept or decline only while awaiting review. | No access | Search and view across firms. Assign, reassign, or close as allowed by the lead state machine. |
 | Case | View case and progress | View and update progress | No access | Search and view across firms. Reassign the case and linked lead. |
-| Plaintiff-uploaded PDFs | Upload and view own PDFs | View while assigned, including PDFs uploaded before acceptance | No access | PDF access is open for review. |
-| Firm-shared case PDFs | View PDFs shared with them, including after reassignment. Upload a copy if they choose to share it with the current firm. | Upload PDFs to share with the plaintiff. View PDFs shared by their own firm. | No case access | PDF access is open for review. |
+| Plaintiff-uploaded PDFs | Upload and view own PDFs | View while assigned, including PDFs uploaded before acceptance | No access | No access |
+| Firm-shared case PDFs | View PDFs shared with them, including after reassignment. Upload a copy if they choose to share it with the current firm. | Upload PDFs to share with the plaintiff. View PDFs shared by their own firm. | No access | No access |
 | Firm-private notes | No access | Add and read notes owned by their firm. If the case returns, they can read notes they wrote during a previous assignment. | No access | Authorized admins can read notes across firms and assignments. |
 | Audit history | No access | No access | No access | Inspect the history of lead and case changes. |
 

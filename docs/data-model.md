@@ -38,7 +38,7 @@ These are the logical fields we need for the workflows.
 
 ## How the model handles changes
 
-- **Accept a lead.** Check that it still awaits review and that the actor belongs to its current firm. Change the lead to Accepted, create the case, and add the audit event in one transaction. The unique constraint on `cases.lead_id` enforces at most one case per lead, including when two staff members accept concurrently.
+- **Accept a lead.** Lock the lead for the duration of the transaction. Check that it still awaits review and that the actor belongs to its current firm. Change the lead to Accepted, create the case, and add the audit event in that transaction. The unique constraint on `cases.lead_id` enforces at most one case per lead.
 - **Reassign a case.** Update the current firm on the lead and save the audit event and any required notice in one transaction. The case keeps its ID and progress. A single assignment field keeps the lead and case in sync.
 - **Check document and note access.** Use the current assignment to check whether the firm can open the record. Use the stored sharing firm or note owner to check which documents and notes it can see. After reassignment, the receiving firm can access plaintiff uploads and its own firm's content. The plaintiff keeps access to PDFs shared with them.
 - **Route a new lead.** Look up the category and region at submission. A match assigns the lead to that firm. An unmatched lead goes to the admin queue. A manual assignment changes that lead's assignment only.
@@ -53,4 +53,4 @@ These are the logical fields we need for the workflows.
 | Current state with append-only audit events | The app reads current state directly and admins can inspect changes in order. Each workflow action must write its audit event alongside the update. Full snapshots would use more storage, and event sourcing would add event replay and versioning. |
 | Separate plaintiff notices | Keeps plaintiff-facing messages easy to query and gives them a separate access rule from the admin audit history. Each action that requires a notice writes one alongside the audit event. |
 
-The [decision log](decisions.md) tracks remaining product questions, including admin access to PDFs, case reopening, and routing tie-breaks.
+The [decision log](decisions.md) tracks remaining product questions, including case reopening and routing tie-breaks.
