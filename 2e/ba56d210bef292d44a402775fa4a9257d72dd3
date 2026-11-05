@@ -1,0 +1,28 @@
+app/workspace.tsx
+  s_079498f144b51a::t_fc367a26a5a562 222-224
+  s_079498f144b51a::t_58f74d811cd1e2 84,229-230,888
+README.md
+  s_079498f144b51a::t_365be29d72b76a 1,16
+app/globals.css
+  s_079498f144b51a::t_004dca033714f1 48-51,320
+app/layout.tsx
+  s_079498f144b51a::t_b4dc1e80ca8c3a 6
+server/http.ts
+  s_079498f144b51a::t_28d7466799a598 19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2eba56d210bef292d44a402775fa4a9257d72dd3",
+  "prompts": {},
+  "sessions": {
+    "s_079498f144b51a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1a8ad-f620-7f02-8c39-3413c6747d65",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Sunny Wu <w.sunny0618@gmail.com>"
+    }
+  }
+}
