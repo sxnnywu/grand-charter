@@ -56,6 +56,6 @@ These are the logical fields we need for the workflows.
 | Seeded routing by category and region | Gives each pair a predictable destination. Supporting multiple eligible firms would require a selection policy such as priority or round-robin. |
 | Current state with append-only audit events | The app reads current state directly and admins can inspect changes in order. Each workflow action must write its audit event alongside the update. Full snapshots would use more storage, and event sourcing would add event replay and versioning. |
 | Separate plaintiff notices | Keeps plaintiff-facing messages easy to query and gives them a separate access rule from the admin audit history. Each action that requires a notice writes one alongside the audit event. |
-| Idempotency keys for lead creation | A retry returns the saved result without creating a duplicate. Concurrent requests with the same key wait for the first transaction. Keeping results until the demo database is reset uses storage and avoids a retry window that could expire. |
+| Idempotency keys for lead, note, and PDF creation | A retry returns the saved result without creating a duplicate. Concurrent requests with the same key wait for the first transaction. Keeping results until the demo database is reset uses storage and avoids a retry window that could expire. |
 
 The [decision log](decisions.md) tracks remaining product questions, including case reopening and routing tie-breaks.

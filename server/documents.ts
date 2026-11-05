@@ -1,9 +1,10 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, unlink } from "node:fs/promises";
 import { resolve } from "node:path";
 import { isFirmStaff } from "./case-work";
 import { db, transaction } from "./db";
 import { isUuid, RequestError } from "./http";
+import { idempotent, requestHash } from "./idempotency";
 import type { User } from "./session";
 
 const maxFileSize = 10 * 1024 * 1024;
@@ -89,12 +90,18 @@ async function readPdfUpload(request: Request) {
   return { bytes, fileName };
 }
 
-export async function uploadDocument(user: User, leadId: string, request: Request) {
+export async function uploadDocument(user: User, leadId: string, request: Request, key: string) {
   documentViewer(user);
   if (!isUuid(leadId)) throw new RequestError(404, "Lead not found.");
   const { bytes, fileName } = await readPdfUpload(request);
-  const key = randomUUID();
-  const path = resolve(directory, `${key}.pdf`);
+  const hash = requestHash({
+    leadId,
+    firmId: user.firmId,
+    fileName,
+    content: createHash("sha256").update(bytes).digest("hex"),
+  });
+  const storageKey = randomUUID();
+  const path = resolve(directory, `${storageKey}.pdf`);
   let createdFile = false;
 
   try {
@@ -105,35 +112,37 @@ export async function uploadDocument(user: User, leadId: string, request: Reques
       );
       const lead = leads[0];
       if (!lead) throw new RequestError(404, "Lead not found.");
-      if (lead.status === "closed") throw new RequestError(409, "This lead is closed.");
-      if (user.firmId && lead.status !== "accepted") {
-        throw new RequestError(409, "Accept this lead before sharing PDFs.");
-      }
-      if (lead.status === "accepted") {
-        const { rows } = await client.query<{ status: string }>("SELECT status FROM cases WHERE lead_id = $1", [leadId]);
-        if (rows[0]?.status === "closed") throw new RequestError(409, "This case is closed.");
-      }
+      return idempotent(client, user.id, "document.create", key, hash, async () => {
+        if (lead.status === "closed") throw new RequestError(409, "This lead is closed.");
+        if (user.firmId && lead.status !== "accepted") {
+          throw new RequestError(409, "Accept this lead before sharing PDFs.");
+        }
+        if (lead.status === "accepted") {
+          const { rows } = await client.query<{ status: string }>("SELECT status FROM cases WHERE lead_id = $1", [leadId]);
+          if (rows[0]?.status === "closed") throw new RequestError(409, "This case is closed.");
+        }
 
-      await mkdir(directory, { recursive: true, mode: 0o700 });
-      const output = await open(path, "wx", 0o600);
-      createdFile = true;
-      try {
-        await output.writeFile(bytes);
-      } finally {
-        await output.close();
-      }
-      const { rows } = await client.query(
-        `INSERT INTO documents (lead_id, uploader_user_id, sharing_firm_id, file_name, storage_key, size_bytes)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         RETURNING id, file_name AS "fileName", size_bytes AS size, created_at AS "createdAt"`,
-        [leadId, user.id, user.firmId, fileName, key, bytes.byteLength],
-      );
-      return { ...rows[0], uploaderName: user.name };
+        await mkdir(directory, { recursive: true, mode: 0o700 });
+        const output = await open(path, "wx", 0o600);
+        createdFile = true;
+        try {
+          await output.writeFile(bytes);
+        } finally {
+          await output.close();
+        }
+        const { rows } = await client.query(
+          `INSERT INTO documents (lead_id, uploader_user_id, sharing_firm_id, file_name, storage_key, size_bytes)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id, file_name AS "fileName", size_bytes AS size, created_at AS "createdAt"`,
+          [leadId, user.id, user.firmId, fileName, storageKey, bytes.byteLength],
+        );
+        return { ...rows[0], uploaderName: user.name };
+      });
     });
   } catch (error) {
     // Preserve the file if a database disconnect makes commit success uncertain.
     if (createdFile) {
-      const saved = await db().query("SELECT 1 FROM documents WHERE storage_key = $1", [key]).catch(() => null);
+      const saved = await db().query("SELECT 1 FROM documents WHERE storage_key = $1", [storageKey]).catch(() => null);
       if (saved && saved.rowCount === 0) await unlink(path).catch(() => {});
     }
     throw error;
