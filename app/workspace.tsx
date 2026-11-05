@@ -125,6 +125,7 @@ function writeRecordUrl(leadId?: string, caseId?: string, replace = false) {
 
 export function Workspace() {
   const [session, setSession] = useState<Session>();
+  const [entrySettled, setEntrySettled] = useState(false);
   const [sessionError, setSessionError] = useState("");
   const [sessionAttempt, setSessionAttempt] = useState(0);
   const [sessionAction, setSessionAction] = useState<"sign-in" | "sign-out" | "switch" | null>(null);
@@ -180,6 +181,13 @@ export function Workspace() {
 
   function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!session) {
+      if (sessionError) {
+        setSessionError("");
+        setSessionAttempt((attempt) => attempt + 1);
+      }
+      return;
+    }
     const fields = new FormData(event.currentTarget);
     void startSession(String(fields.get("email")), "sign-in");
   }
@@ -210,33 +218,33 @@ export function Workspace() {
   }
 
   return (
-    <main className="demo-entry">
-      <section className="panel demo-entry-card motion-enter" aria-labelledby="demo-heading">
+    <main className="demo-entry" data-settled={entrySettled || undefined}
+      onFocusCapture={() => setEntrySettled(true)} onPointerDownCapture={() => setEntrySettled(true)}>
+      <section className="panel demo-entry-card" aria-labelledby="demo-heading" onAnimationEnd={(event) => {
+        if (event.animationName === "sign-in-arrive") setEntrySettled(true);
+      }}>
         <Brand />
         <header className="page-heading">
           <h1 id="demo-heading">Sign in to the demo</h1>
           <p>Choose a demo account to try the workspace.</p>
         </header>
         {sessionError && <Message error>{sessionError}</Message>}
-        {session ? (
-          <form className="form-stack" onSubmit={signIn}>
-            <label className="field">Demo account
-              <select name="email" required defaultValue="">
-                <option value="" disabled>Choose an account</option>
-                {session.accounts.map((account) => (
-                  <option key={account.id} value={account.email}>{account.name} · {roleName(account)}</option>
-                ))}
-              </select>
-            </label>
-            <button className="button primary" disabled={!!sessionAction || session.accounts.length === 0} type="submit">
-              {sessionAction ? "Signing in…" : "Sign in"} <Icon name="arrow" size={16} />
-            </button>
-          </form>
-        ) : sessionError ? (
-          <button className="button" onClick={() => { setSessionError(""); setSessionAttempt((attempt) => attempt + 1); }}>
-            Try again
+        <p className="visually-hidden" role="status">
+          {session ? "Demo accounts ready." : sessionError ? "" : "Loading demo accounts…"}
+        </p>
+        <form className="form-stack" onSubmit={signIn} aria-busy={!session && !sessionError}>
+          <label className="field">Demo account
+            <select name="email" required defaultValue="" disabled={!session || !!sessionAction}>
+              <option value="" disabled>{session ? "Choose an account" : sessionError ? "Accounts unavailable" : "Loading accounts…"}</option>
+              {session?.accounts.map((account) => (
+                <option key={account.id} value={account.email}>{account.name} · {roleName(account)}</option>
+              ))}
+            </select>
+          </label>
+          <button className="button primary" disabled={!!sessionAction || (!session && !sessionError) || session?.accounts.length === 0} type="submit">
+            {!session && sessionError ? "Try again" : sessionAction ? "Signing in…" : "Sign in"} <Icon name="arrow" size={16} />
           </button>
-        ) : <p className="muted" role="status">Loading demo accounts…</p>}
+        </form>
         <p className="demo-notice">Use fictional information in this demo.</p>
       </section>
     </main>
