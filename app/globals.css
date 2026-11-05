@@ -92,6 +92,49 @@
   padding: 10px 12px;
 }
 
+.admin-tools {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.admin-assignment-form {
+  margin-top: 10px;
+}
+
+.admin-assignment-form .detail-actions {
+  margin-top: 0;
+}
+
+.admin-history ol {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+  padding-left: 16px;
+  list-style: none;
+  border-left: 1px solid var(--line);
+}
+
+.admin-history li {
+  position: relative;
+}
+
+.admin-history li::before {
+  position: absolute;
+  left: -20px;
+  top: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--indigo);
+  content: "";
+}
+
+.admin-history li small, .plaintiff-notices small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .plaintiff-notices {
   display: grid;
   gap: 8px;

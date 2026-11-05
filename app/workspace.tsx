@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { categories, regions } from "@/lib/intake-options";
+import { AdminTools, type Firm } from "./admin-tools";
 import { messageFor, post, request } from "./api-client";
 import { animateWorkspace, observeScrollReveals, stopWorkspaceTransition } from "./workspace-motion";
 
@@ -11,7 +12,6 @@ type User = Omit<Account, "email"> & { firmId: string | null };
 type Session = { user: User | null; accounts: Account[] };
 type LeadStatus = "pending_assignment" | "awaiting_firm_review" | "accepted" | "declined" | "closed";
 type CaseStatus = "open" | "in_progress" | "closed";
-type Firm = { id: string; name: string };
 type StaffFilter = LeadStatus | "all" | "cases";
 type PlaintiffNotice = { id: string; message: string; createdAt: string };
 export type Lead = {
@@ -329,12 +329,13 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const [firms, setFirms] = useState<Firm[]>([]);
   const [firmsError, setFirmsError] = useState("");
   const [firmsAttempt, setFirmsAttempt] = useState(0);
+  const [childBusy, setChildBusy] = useState(false);
   const content = useRef<HTMLDivElement>(null);
   const requestListScroll = useRef<number | null>(null);
   const currentResult = leadResult?.id === selectedId ? leadResult : undefined;
   const lead = currentResult && "lead" in currentResult ? currentResult.lead : undefined;
   const recordError = currentResult && "error" in currentResult ? currentResult.error : undefined;
-  const acting = action !== undefined;
+  const acting = action !== undefined || childBusy;
   const parameters = new URLSearchParams();
   if (!isPlaintiff && filter !== "all" && filter !== "cases") parameters.set("status", filter);
   if (region) parameters.set("region", region);
@@ -524,6 +525,13 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     }
   }
 
+  function updateAssignment(updated: Lead, message: string) {
+    setLeadResult({ id: updated.id, lead: updated });
+    setLeads((current) => current?.map((item) => item.id === updated.id ? updated : item));
+    setListAttempt((attempt) => attempt + 1);
+    setNotice(message);
+  }
+
   const pagination = nextCursor || moreError ? (
     <div className="queue-pagination">
       {moreError && <Message error>{moreError}</Message>}
@@ -536,11 +544,14 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const record = selectedId ? (
     caseId && lead?.caseId === caseId ?
       <CaseDetail key={caseId} id={caseId} lead={lead} back={() => selectCase()} role={user.role}
-        locked={acting} /> :
+        locked={acting}
+        adminTools={isAdmin ? <AdminTools lead={lead} caseView firms={firms} onUpdated={updateAssignment}
+          onBusyChange={setChildBusy} /> : undefined} /> :
     lead ? (
       <LeadDetail key={lead.id} lead={lead} plaintiff={isPlaintiff} admin={isAdmin}
         decision={action === "submit" ? undefined : action} decideLead={decideLead}
-        actionError={actionError} close={() => select()} openCase={selectCase} locked={acting} />
+        actionError={actionError} close={() => select()} openCase={selectCase} locked={acting}
+        tools={isAdmin ? <AdminTools lead={lead} firms={firms} onUpdated={updateAssignment} onBusyChange={setChildBusy} /> : undefined} />
     ) : (
       <div className="bookshelf-placeholder">
         <button className="subtle-link" onClick={() => select()}><Icon name="back" size={16} />{home}</button>
@@ -876,8 +887,9 @@ function PlaintiffNotices({ notices }: { notices?: PlaintiffNotice[] }) {
   </section>;
 }
 
-function CaseDetail({ id, lead, back, role, locked }: {
+function CaseDetail({ id, lead, back, role, locked, adminTools }: {
   id: string; lead: Lead; back: () => void; role: Role; locked: boolean;
+  adminTools?: ReactNode;
 }) {
   const plaintiff = role === "plaintiff";
   const [item, setItem] = useState<Case>();
@@ -917,6 +929,7 @@ function CaseDetail({ id, lead, back, role, locked }: {
             </dl>
           </section>
           {plaintiff && <PlaintiffNotices notices={lead.notices} />}
+          {adminTools}
           </>
         ) : <p role="status" className="muted">Loading case…</p>}
       </div>
