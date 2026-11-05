@@ -1,0 +1,35 @@
+.case-tool {
+  display: grid;
+  gap: 10px;
+}
+
+.case-tool h3 + p {
+  margin-top: 3px;
+}
+
+.case-progress-action,
+.case-note-form {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+}
+
+.case-note-form .field {
+  width: 100%;
+}
+
+.case-feedback {
+  color: var(--indigo);
+  font-size: 13px;
+}
+
+.case-feedback-error {
+  color: var(--danger);
+}
+
+.case-load-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
