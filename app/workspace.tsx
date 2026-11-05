@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { categories, regions } from "@/lib/intake-options";
 
 type Role = "plaintiff" | "attorney" | "paralegal" | "admin";
@@ -44,6 +44,7 @@ const glyphs = {
   file: "M6 3h8l4 4v13H6ZM14 3v5h4m-8 5h4m-4 4h4",
   inbox: "M4 4h16l2 10v6H2v-6Zm-2 10h6l2 3h4l2-3h6",
   chevron: "m9 6 6 6-6 6",
+  down: "m6 9 6 6 6-6",
   arrow: "M4 12h15m-6-6 6 6-6 6",
   back: "M20 12H5m6 6-6-6 6-6",
   check: "m5 12 4 4L19 6",
@@ -127,7 +128,8 @@ export function Workspace() {
   const [session, setSession] = useState<Session>();
   const [sessionError, setSessionError] = useState("");
   const [sessionAttempt, setSessionAttempt] = useState(0);
-  const [signing, setSigning] = useState(false);
+  const [sessionAction, setSessionAction] = useState<"sign-in" | "sign-out" | "switch" | null>(null);
+  const sessionBusy = useRef(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -139,27 +141,40 @@ export function Workspace() {
     return () => controller.abort();
   }, [sessionAttempt]);
 
-  async function signIn(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const fields = new FormData(event.currentTarget);
+  async function startSession(email: string, action: "sign-in" | "switch") {
+    if (sessionBusy.current) return;
+    sessionBusy.current = true;
     setSessionError("");
-    setSigning(true);
+    setSessionAction(action);
     try {
       const { user } = await post<Pick<Session, "user">>("/api/session", {
-        email: String(fields.get("email")),
+        email,
         password: "grand-charter-demo",
       });
+      if (action === "switch") {
+        writeRecordUrl(undefined, undefined, true);
+        window.scrollTo(0, 0);
+      }
       setSession((current) => current && { ...current, user });
     } catch (error) {
       setSessionError(messageFor(error));
     } finally {
-      setSigning(false);
+      sessionBusy.current = false;
+      setSessionAction(null);
     }
   }
 
+  function signIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const fields = new FormData(event.currentTarget);
+    void startSession(String(fields.get("email")), "sign-in");
+  }
+
   async function signOut() {
+    if (sessionBusy.current) return;
+    sessionBusy.current = true;
     setSessionError("");
-    setSigning(true);
+    setSessionAction("sign-out");
     try {
       await request("/api/session", { method: "DELETE" });
       writeRecordUrl(undefined, undefined, true);
@@ -167,14 +182,16 @@ export function Workspace() {
     } catch (error) {
       setSessionError(messageFor(error));
     } finally {
-      setSigning(false);
+      sessionBusy.current = false;
+      setSessionAction(null);
     }
   }
 
   if (session?.user) {
     const email = session.accounts.find((account) => account.id === session.user?.id)?.email ?? "";
     return <Portal key={session.user.id} user={session.user} email={email} signOut={signOut}
-      signingOut={signing} sessionError={sessionError} />;
+      accounts={session.accounts} switchAccount={(email) => startSession(email, "switch")}
+      sessionAction={sessionAction === "sign-in" ? null : sessionAction} sessionError={sessionError} />;
   }
 
   return (
@@ -196,8 +213,8 @@ export function Workspace() {
                 ))}
               </select>
             </label>
-            <button className="button primary" disabled={signing || session.accounts.length === 0} type="submit">
-              {signing ? "Signing in…" : "Sign in"} <Icon name="arrow" size={16} />
+            <button className="button primary" disabled={!!sessionAction || session.accounts.length === 0} type="submit">
+              {sessionAction ? "Signing in…" : "Sign in"} <Icon name="arrow" size={16} />
             </button>
           </form>
         ) : sessionError ? (
@@ -211,8 +228,79 @@ export function Workspace() {
   );
 }
 
-function Portal({ user, email, signOut, signingOut, sessionError }: {
-  user: User; email: string; signOut: () => void; signingOut: boolean; sessionError: string;
+const accountGroups: { title: string; roles: Role[] }[] = [
+  { title: "Plaintiffs", roles: ["plaintiff"] },
+  { title: "Firm staff", roles: ["attorney", "paralegal"] },
+  { title: "Admin", roles: ["admin"] },
+];
+
+function AccountSwitcher({ user, accounts, disabled, switching, onSwitch }: {
+  user: User; accounts: Account[]; disabled: boolean; switching: boolean; onSwitch: (email: string) => void;
+}) {
+  const disclosure = useRef<HTMLDetailsElement>(null);
+  const trigger = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    function closeOnOutsideClick(event: PointerEvent) {
+      const menu = disclosure.current;
+      if (menu?.open && !menu.contains(event.target as Node)) menu.open = false;
+    }
+    document.addEventListener("pointerdown", closeOnOutsideClick);
+    return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
+  }, []);
+
+  function closeAndFocus() {
+    if (disclosure.current) disclosure.current.open = false;
+    trigger.current?.focus();
+  }
+
+  return (
+    <details className="account-switcher" ref={disclosure}
+      onBlur={(event) => {
+        if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && event.currentTarget.open) {
+          event.preventDefault();
+          closeAndFocus();
+        }
+      }}>
+      <summary className="button small account-trigger" ref={trigger} aria-disabled={disabled || undefined}
+        aria-label={switching ? "Switching account" : `Switch account, currently ${user.name}`}
+        onClick={(event) => { if (disabled) event.preventDefault(); }}>
+        <span className="account-avatar" aria-hidden="true">{initials(user.name)}</span>
+        <span>{switching ? "Switching…" : "Switch account"}</span>
+        <Icon name="down" size={14} />
+      </summary>
+      <div className="account-menu" aria-label="Demo accounts">
+        {accountGroups.map(({ title, roles }) => {
+          const group = accounts.filter((account) => roles.includes(account.role));
+          return group.length > 0 && <div className="account-group" key={title}>
+            <h2>{title}</h2>
+            {group.map((account) => {
+              const current = account.id === user.id;
+              return (
+                <button className="account-option" type="button" key={account.id} aria-current={current || undefined}
+                  disabled={disabled || current} onClick={() => { closeAndFocus(); onSwitch(account.email); }}>
+                  <span className="account-avatar" aria-hidden="true">{initials(account.name)}</span>
+                  <span className="account-option-copy">
+                    <strong>{account.name}</strong>
+                    {account.firmName && <small>{account.role === "paralegal" ? "Paralegal" : "Attorney"} · {account.firmName}</small>}
+                  </span>
+                  {current && <Icon name="check" size={16} />}
+                </button>
+              );
+            })}
+          </div>;
+        })}
+      </div>
+    </details>
+  );
+}
+
+function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, sessionError }: {
+  user: User; email: string; accounts: Account[]; switchAccount: (email: string) => void; signOut: () => void;
+  sessionAction: "sign-out" | "switch" | null; sessionError: string;
 }) {
   const isPlaintiff = user.role === "plaintiff";
   const isAdmin = user.role === "admin";
@@ -350,16 +438,16 @@ function Portal({ user, email, signOut, signingOut, sessionError }: {
   );
 
   return (
-    <div className="shell">
+    <div className="shell demo-portal">
       <aside className="sidebar" aria-label="Workspace">
         <Brand />
         <div className="workspace-label">Workspace</div>
         <nav className="nav-list" aria-label="Main navigation">
-          <button className="nav-item" aria-current={!composing ? "page" : undefined} onClick={() => showIntake(false)} disabled={acting}>
+          <button className="nav-item" aria-current={!composing ? "page" : undefined} onClick={() => showIntake(false)} disabled={acting || !!sessionAction}>
             <Icon name={isPlaintiff ? "requests" : "inbox"} />{home}
           </button>
           {isPlaintiff && (
-            <button className="nav-item" aria-current={composing ? "page" : undefined} onClick={() => showIntake(true)} disabled={!leads || acting}>
+            <button className="nav-item" aria-current={composing ? "page" : undefined} onClick={() => showIntake(true)} disabled={!leads || acting || !!sessionAction}>
               <Icon name="plus" />Submit a request
             </button>
           )}
@@ -376,11 +464,15 @@ function Portal({ user, email, signOut, signingOut, sessionError }: {
           <div className="breadcrumbs"><span>{roleName(user)}</span><Icon name="chevron" size={13} />
             <strong>{composing ? "Submit a request" : home}</strong>
           </div>
-          <button className="button small" onClick={signOut} disabled={signingOut || acting}>
-            {signingOut ? "Signing out…" : "Sign out"}
-          </button>
+          <div className="topbar-actions">
+            <AccountSwitcher user={user} accounts={accounts} disabled={acting || !!sessionAction}
+              switching={sessionAction === "switch"} onSwitch={switchAccount} />
+            <button className="button small" onClick={signOut} disabled={!!sessionAction || acting}>
+              {sessionAction === "sign-out" ? "Signing out…" : "Sign out"}
+            </button>
+          </div>
         </header>
-        <div className="content">
+        <div className="content" inert={!!sessionAction}>
           {sessionError && <Message error>{sessionError}</Message>}
           {notice && <Message>{notice}</Message>}
           {composing ? (
