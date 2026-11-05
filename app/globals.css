@@ -64,3 +64,122 @@
 .demo-guide .notice {
   margin-top: 14px;
 }
+
+.demo-portal .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.topbar-actions {
+  position: relative;
+  z-index: 3;
+}
+
+.account-trigger {
+  cursor: pointer;
+  list-style: none;
+}
+
+.account-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.account-trigger[aria-disabled="true"] {
+  cursor: default;
+  opacity: .65;
+}
+
+.account-trigger .account-avatar {
+  width: 22px;
+  height: 22px;
+}
+
+.account-switcher[open] .account-trigger {
+  border-color: var(--indigo);
+  background: var(--indigo-pale);
+}
+
+.account-switcher[open] .account-trigger > svg:last-child {
+  transform: rotate(180deg);
+}
+
+.account-menu {
+  position: absolute;
+  inset-block-start: calc(100% + 8px);
+  inset-inline-end: 0;
+  width: min(284px, calc(100vw - 32px));
+  max-height: min(400px, 65dvh);
+  overflow: auto;
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: 0 9px 28px #2026381c;
+}
+
+.account-menu h2 {
+  padding: 6px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.account-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ink);
+  background: transparent;
+  text-align: start;
+}
+
+.account-option:hover, .account-option[aria-current="true"] {
+  color: var(--indigo);
+  background: var(--indigo-pale);
+}
+
+.account-option-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.account-option-copy strong, .account-option-copy small {
+  display: block;
+}
+
+.account-option-copy strong {
+  font-size: 13px;
+}
+
+.account-option-copy small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.account-avatar {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--indigo);
+  background: var(--indigo-pale);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .demo-portal:has(.bookshelf.has-selection) .topbar {
+    display: flex;
+  }
+
+  .demo-portal:has(.bookshelf.has-selection) .content > .workspace-message {
+    margin: 12px 16px;
+  }
+}
