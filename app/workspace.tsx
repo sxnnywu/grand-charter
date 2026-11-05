@@ -27,6 +27,7 @@ type Case = Pick<Lead, "id" | "name" | "category" | "region" | "firmName" | "cre
   status: CaseStatus;
 };
 type LeadResult = { id: string; lead: Lead } | { id: string; error: string };
+type LeadDecision = "accept" | "decline";
 
 const statuses: Record<LeadStatus | CaseStatus, [string, string]> = {
   pending_assignment: ["Pending assignment", "pending"],
@@ -316,7 +317,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const [leadResult, setLeadResult] = useState<LeadResult>();
   const [caseId, setCaseId] = useState<string>();
   const [notice, setNotice] = useState("");
-  const [acting, setActing] = useState(false);
+  const [action, setAction] = useState<LeadDecision | "submit">();
   const [actionError, setActionError] = useState("");
   const [filter, setFilter] = useState<LeadStatus | "all">(isAdmin ? "all" : "awaiting_firm_review");
   const content = useRef<HTMLDivElement>(null);
@@ -324,6 +325,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const currentResult = leadResult?.id === selectedId ? leadResult : undefined;
   const lead = currentResult && "lead" in currentResult ? currentResult.lead : undefined;
   const recordError = currentResult && "error" in currentResult ? currentResult.error : undefined;
+  const acting = action !== undefined;
 
   useEffect(() => {
     function restoreRecord() {
@@ -370,13 +372,15 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     const controller = new AbortController();
     request<{ lead: Lead }>(`/api/leads/${encodeURIComponent(selectedId)}`, { signal: controller.signal })
       .then(({ lead }) => {
-        if (!controller.signal.aborted) setLeadResult({ id: selectedId, lead });
+        if (controller.signal.aborted) return;
+        setLeadResult({ id: selectedId, lead });
+        if (!isPlaintiff && !isAdmin) setFilter(lead.status);
       })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setLeadResult({ id: selectedId, error: messageFor(error) });
       });
     return () => controller.abort();
-  }, [selectedId]);
+  }, [selectedId, isPlaintiff, isAdmin]);
 
   function applySelection(id?: string) {
     if (selectedId !== id) setLeadResult(undefined);
@@ -414,7 +418,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     setActionError("");
-    setActing(true);
+    setAction("submit");
     try {
       const input = Object.fromEntries(["name", "email", "region", "category", "description"]
         .map((name) => [name, String(form.get(name) ?? "")]));
@@ -427,25 +431,31 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     } catch (error) {
       setActionError(messageFor(error));
     } finally {
-      setActing(false);
+      setAction(undefined);
     }
   }
 
-  async function acceptLead() {
+  async function decideLead(decision: LeadDecision) {
     if (!lead || acting) return;
     setActionError("");
-    setActing(true);
+    setAction(decision);
     try {
-      const { caseId } = await request<{ caseId: string }>(`/api/leads/${lead.id}/accept`, { method: "POST" });
-      const accepted: Lead = { ...lead, status: "accepted", caseId };
-      setLeads((current) => current?.map((item) => item.id === lead.id ? accepted : item));
-      setLeadResult({ id: accepted.id, lead: accepted });
-      setFilter("accepted");
-      setNotice("Lead accepted and case opened.");
+      let updated: Lead;
+      if (decision === "accept") {
+        const { caseId } = await request<{ caseId: string }>(`/api/leads/${lead.id}/accept`, { method: "POST" });
+        updated = { ...lead, status: "accepted", caseId };
+      } else {
+        const { lead: declined } = await request<{ lead: Lead }>(`/api/leads/${lead.id}/decline`, { method: "POST" });
+        updated = declined;
+      }
+      setLeads((current) => current?.map((item) => item.id === updated.id ? updated : item));
+      setLeadResult({ id: updated.id, lead: updated });
+      setFilter(updated.status);
+      setNotice(decision === "accept" ? "Lead accepted and case opened." : "Lead declined and sent to admin review.");
     } catch (error) {
       setActionError(messageFor(error));
     } finally {
-      setActing(false);
+      setAction(undefined);
     }
   }
 
@@ -453,8 +463,9 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     caseId && lead?.caseId === caseId ?
       <CaseDetail key={caseId} id={caseId} back={() => selectCase()} plaintiff={isPlaintiff} /> :
     lead ? (
-      <LeadDetail key={lead.id} lead={lead} plaintiff={isPlaintiff} admin={isAdmin} accepting={acting}
-        acceptLead={acceptLead} actionError={actionError} close={() => select()} openCase={selectCase} />
+      <LeadDetail key={lead.id} lead={lead} plaintiff={isPlaintiff} admin={isAdmin}
+        decision={action === "submit" ? undefined : action} decideLead={decideLead}
+        actionError={actionError} close={() => select()} openCase={selectCase} />
     ) : (
       <div className="bookshelf-placeholder">
         <button className="subtle-link" onClick={() => select()}><Icon name="back" size={16} />{home}</button>
@@ -607,8 +618,8 @@ function StaffList({ leads, selectedId, select, admin, filter, changeFilter, rec
   leads: Lead[]; selectedId?: string; select: (id: string) => void; admin: boolean;
   filter: LeadStatus | "all"; changeFilter: (value: LeadStatus | "all") => void; record: ReactNode; locked: boolean;
 }) {
-  const tabs = admin ? [["all", "All leads"], ["pending_assignment", "Unmatched"]] as const :
-    [["awaiting_firm_review", "Active"], ["accepted", "Accepted"]] as const;
+  const tabs = admin ? [["all", "All leads"], ["pending_assignment", "Unmatched"], ["declined", "Declined"]] as const :
+    [["awaiting_firm_review", "Active"], ["accepted", "Accepted"], ["declined", "Declined"]] as const;
   const filtered = leads.filter((lead) => filter === "all" || lead.status === filter);
   return (
     <>
@@ -645,10 +656,12 @@ function StaffList({ leads, selectedId, select, admin, filter, changeFilter, rec
   );
 }
 
-function LeadDetail({ lead, plaintiff, admin, accepting, acceptLead, actionError, close, openCase }: {
-  lead: Lead; plaintiff: boolean; admin: boolean; accepting: boolean; acceptLead: () => void; actionError: string;
+function LeadDetail({ lead, plaintiff, admin, decision, decideLead, actionError, close, openCase }: {
+  lead: Lead; plaintiff: boolean; admin: boolean; decision?: LeadDecision;
+  decideLead: (decision: LeadDecision) => void; actionError: string;
   close: () => void; openCase: (id: string) => void;
 }) {
+  const declineDialog = useRef<HTMLDialogElement>(null);
   const title = plaintiff ? requestTitle(lead) : lead.name;
   const statusMessage = lead.status === "accepted" ? `${lead.firmName ?? "Your firm"} accepted your request and opened a case.` :
     lead.status === "awaiting_firm_review" ? `${lead.firmName ?? "The assigned firm"} is reviewing your request.` :
@@ -688,10 +701,32 @@ function LeadDetail({ lead, plaintiff, admin, accepting, acceptLead, actionError
         </footer>
       ) : !plaintiff && !admin && lead.status === "awaiting_firm_review" ? (
         <footer className="review-footer" data-review-state="review" key="review">
-          <div className="review-footer-copy"><strong>Lead decision</strong><small>Accept to open a case.</small></div>
-          <button className="button primary" onClick={acceptLead} disabled={accepting}>
-            <Icon name="check" size={16} />{accepting ? "Accepting…" : "Accept lead"}
-          </button>
+          <div className="review-footer-copy"><strong>Lead decision</strong><small>Accept to open a case or decline for admin review.</small></div>
+          <div className="detail-actions">
+            <button className="button danger" onClick={() => declineDialog.current?.showModal()} disabled={!!decision}>
+              {decision === "decline" ? "Declining…" : "Decline lead"}
+            </button>
+            <button className="button primary" onClick={() => decideLead("accept")} disabled={!!decision}>
+              <Icon name="check" size={16} />{decision === "accept" ? "Accepting…" : "Accept lead"}
+            </button>
+          </div>
+          <dialog ref={declineDialog} aria-labelledby="decline-title" aria-describedby="decline-description">
+            <div className="dialog-head"><h2 id="decline-title">Decline this lead?</h2></div>
+            <div className="dialog-body"><p id="decline-description">
+              This sends the lead to the admin queue. Your firm can still view it while it remains assigned to you.
+            </p></div>
+            <form className="dialog-footer" method="dialog">
+              <button className="button" type="submit">Cancel</button>
+              <button className="button primary danger" type="button" onClick={() => {
+                declineDialog.current?.close();
+                decideLead("decline");
+              }}>Decline lead</button>
+            </form>
+          </dialog>
+        </footer>
+      ) : !plaintiff && !admin && lead.status === "declined" ? (
+        <footer className="review-footer motion-enter motion-feedback" data-review-state="declined" key="declined">
+          <div className="review-footer-copy"><strong>Awaiting admin review</strong><small>Your firm can still view this lead while it’s assigned.</small></div>
         </footer>
       ) : null}
     </article>

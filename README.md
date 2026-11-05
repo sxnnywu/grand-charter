@@ -19,7 +19,9 @@ Open [Grand Charter](http://127.0.0.1:3000). Choose a fictional demo account. Ea
 2. Use **Switch account** to choose Alex or Priya at Northline. Open the lead from the inbox and accept it. The lead stays under **Accepted**, where you can open the linked case.
 3. Switch back to Maya and open the same case from your request list.
 
-This first build persists users, sessions, leads, cases, and audit events in PostgreSQL. Unmatched submissions stay pending and are visible to the demo admin. Decline and admin assignment actions, case progress updates, PDFs, private notes, and the audit history screen are still to come.
+To try the other review outcome, submit a second Ontario employment lead and choose **Decline lead** in Northline’s inbox. The firm can find it under **Declined**, the plaintiff sees **Awaiting admin review**, and Morgan can find it in the admin queue.
+
+The app persists users, sessions, leads, cases, and audit events in PostgreSQL. Unmatched submissions stay pending and are visible to the demo admin. Admin assignment and closure, case progress updates, PDFs, private notes, and the audit history screen are still to come.
 
 Run `npm run typecheck` or `npm run build` to check the app. Stop the database with `docker compose stop db`. The database volume keeps records between runs.
 

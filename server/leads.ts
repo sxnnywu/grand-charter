@@ -1,4 +1,5 @@
 import { categories, regions } from "@/lib/intake-options";
+import type { PoolClient } from "pg";
 import { db, transaction } from "./db";
 import { isUuid, RequestError } from "./http";
 import type { User } from "./session";
@@ -89,9 +90,14 @@ export async function submitLead(user: User, body: Record<string, unknown>) {
   return getLead(user, id);
 }
 
-export async function acceptLead(user: User, id: string) {
+function reviewLead<T>(
+  user: User,
+  id: string,
+  decision: "accept" | "decline",
+  apply: (client: PoolClient) => Promise<T>,
+) {
   if (!user.firmId || (user.role !== "attorney" && user.role !== "paralegal")) {
-    throw new RequestError(403, "Only assigned firm staff can accept a lead.");
+    throw new RequestError(403, `Only assigned firm staff can ${decision} a lead.`);
   }
   if (!isUuid(id)) throw new RequestError(404, "Lead not found.");
 
@@ -104,7 +110,12 @@ export async function acceptLead(user: User, id: string) {
     if (rows[0].status !== "awaiting_firm_review") {
       throw new RequestError(409, "This lead is no longer awaiting review.");
     }
+    return apply(client);
+  });
+}
 
+export function acceptLead(user: User, id: string) {
+  return reviewLead(user, id, "accept", async (client) => {
     await client.query("UPDATE leads SET status = 'accepted' WHERE id = $1", [id]);
     const opened = await client.query<{ id: string }>(
       "INSERT INTO cases (lead_id) VALUES ($1) RETURNING id",
@@ -114,9 +125,22 @@ export async function acceptLead(user: User, id: string) {
     await client.query(
       `INSERT INTO audit_events (lead_id, event_type, actor_user_id, before_values, after_values)
        VALUES ($1, 'lead_accepted', $2, $3, $4)`,
-      [id, user.id, { status: rows[0].status }, { status: "accepted", caseId, caseStatus: "open" }],
+      [id, user.id, { status: "awaiting_firm_review" }, { status: "accepted", caseId, caseStatus: "open" }],
     );
     return caseId;
+  });
+}
+
+export function declineLead(user: User, id: string) {
+  return reviewLead(user, id, "decline", async (client) => {
+    await client.query("UPDATE leads SET status = 'declined' WHERE id = $1", [id]);
+    await client.query(
+      `INSERT INTO audit_events (lead_id, event_type, actor_user_id, before_values, after_values)
+       VALUES ($1, 'lead_declined', $2, $3, $4)`,
+      [id, user.id, { status: "awaiting_firm_review" }, { status: "declined" }],
+    );
+    const { rows } = await client.query(`${leadDetails} WHERE l.id = $1`, [id]);
+    return rows[0];
   });
 }
 
