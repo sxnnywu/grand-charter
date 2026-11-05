@@ -227,6 +227,17 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
         <p className="detail-copy">{role === "plaintiff" ? "Documents you upload and PDFs the firm shares with you."
           : "Plaintiff uploads and PDFs shared by your firm."}</p>
       </div>
+      {canUpload && items && (
+        <form className="case-upload" onSubmit={upload}>
+          <label className="field">
+            <span>Choose a PDF <span className="case-field-hint">(up to 10 MB)</span></span>
+            <input ref={fileInput} type="file" name="file" accept="application/pdf,.pdf" required disabled={disabled || saving}
+              onChange={() => setFeedback({})} />
+          </label>
+          <button className="button small" type="submit" disabled={disabled || saving}>{saving ? "Uploading…" : "Upload PDF"}</button>
+        </form>
+      )}
+      <Feedback {...feedback} />
       {error ? <LoadError error={error} retry={retry} /> : loading || !items ? <p className="detail-copy" role="status">Loading PDFs…</p> :
         items.length ? (
           <ul className="file-list">
@@ -243,16 +254,6 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
             ))}
           </ul>
         ) : <p className="detail-empty">No PDFs have been shared yet.</p>}
-      {canUpload && items && (
-        <form className="case-upload" onSubmit={upload}>
-          <label className="field">
-            <span>Choose a PDF <span className="case-field-hint">(up to 10 MB)</span></span>
-            <input ref={fileInput} type="file" name="file" accept="application/pdf,.pdf" required disabled={disabled || saving} />
-          </label>
-          <button className="button small" type="submit" disabled={disabled || saving}>{saving ? "Uploading…" : "Upload PDF"}</button>
-        </form>
-      )}
-      <Feedback {...feedback} />
       {!error && <RecordPagination records={records} label="PDF pages" disabled={disabled || saving} />}
     </section>
   );
@@ -303,6 +304,19 @@ function Notes({ caseId, canWrite, disabled, onBusyChange, onAccessLost, refresh
         <h3>Firm-private notes</h3>
         <p className="detail-copy">Notes stay with the firm that wrote them. Authorized admins can review them.</p>
       </div>
+      {canWrite && items && (
+        <form className="case-note-form" onSubmit={addNote}>
+          <label className="field">Private note
+            <textarea name="body" required maxLength={maxNoteLength} value={body}
+              onChange={(event) => { setBody(event.target.value); setFeedback({}); }}
+              disabled={disabled || saving} />
+          </label>
+          <button className="button small" type="submit" disabled={disabled || saving || !body.trim()}>
+            {saving ? "Adding…" : "Add note"}
+          </button>
+        </form>
+      )}
+      <Feedback {...feedback} />
       {error ? <LoadError error={error} retry={retry} /> : loading || !items ? <p className="detail-copy" role="status">Loading notes…</p> :
         items.length ? (
           <ul className="note-list">
@@ -318,18 +332,6 @@ function Notes({ caseId, canWrite, disabled, onBusyChange, onAccessLost, refresh
             ))}
           </ul>
         ) : <p className="detail-empty">No private notes yet.</p>}
-      {canWrite && items && (
-        <form className="case-note-form" onSubmit={addNote}>
-          <label className="field">Private note
-            <textarea name="body" required maxLength={maxNoteLength} value={body}
-              onChange={(event) => setBody(event.target.value)} disabled={disabled || saving} />
-          </label>
-          <button className="button small" type="submit" disabled={disabled || saving || !body.trim()}>
-            {saving ? "Adding…" : "Add note"}
-          </button>
-        </form>
-      )}
-      <Feedback {...feedback} />
       {!error && <RecordPagination records={records} label="Private note pages" disabled={disabled || saving} />}
     </section>
   );
@@ -347,10 +349,17 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
   disabled?: boolean;
 }) {
   const [action, setAction] = useState<CaseTool>();
+  const [activeTab, setActiveTab] = useState<"documents" | "notes">(role === "admin" ? "notes" : "documents");
   const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
   const closeDialog = useRef<HTMLDialogElement>(null);
+  const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
   const staff = role === "attorney" || role === "paralegal";
   const busy = disabled || !!action;
+  const tabs = [
+    ...(role !== "admin" ? [{ id: "documents" as const, label: "Documents" }] : []),
+    ...(role !== "plaintiff" ? [{ id: "notes" as const, label: "Notes" }] : []),
+  ];
+  const visibleTab = tabs.some((tab) => tab.id === activeTab) ? activeTab : tabs[0].id;
   const currentStage = stages.findIndex((stage) => stage.status === status);
   const nextStatus = status === "open" ? "in_progress" : status === "in_progress" ? "closed" : undefined;
 
@@ -419,14 +428,46 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
         )}
         <Feedback {...feedback} />
       </section>
-      <LeadDocuments leadId={leadId} canUpload={status !== "closed"} role={role}
-        disabled={busy} onBusyChange={(busy) => report("documents", busy)}
-        onAccessLost={onAccessLost} refreshVersion={refreshVersion} />
-      {role !== "plaintiff" && (
-        <Notes key={caseId} caseId={caseId} canWrite={staff && status !== "closed"}
-          disabled={busy} onBusyChange={(busy) => report("notes", busy)}
-          onAccessLost={onAccessLost} refreshVersion={refreshVersion} />
-      )}
+      <div className="case-content">
+        {tabs.length > 1 && (
+          <div className="case-content-tabs" role="tablist" aria-label="Case information">
+            {tabs.map((tab, index) => (
+              <button key={tab.id} ref={(element) => { tabButtons.current[index] = element; }}
+                className="case-content-tab" type="button" role="tab" id={`${caseId}-${tab.id}-tab`}
+                aria-controls={`${caseId}-${tab.id}-panel`} aria-selected={visibleTab === tab.id}
+                tabIndex={visibleTab === tab.id ? 0 : -1} disabled={busy}
+                onClick={() => setActiveTab(tab.id)}
+                onKeyDown={(event) => {
+                  const position = event.key === "ArrowRight" ? (index + 1) % tabs.length
+                    : event.key === "ArrowLeft" ? (index + tabs.length - 1) % tabs.length
+                      : event.key === "Home" ? 0 : event.key === "End" ? tabs.length - 1 : undefined;
+                  if (position === undefined) return;
+                  event.preventDefault();
+                  setActiveTab(tabs[position].id);
+                  tabButtons.current[position]?.focus();
+                }}>{tab.label}</button>
+            ))}
+          </div>
+        )}
+        {role !== "admin" && (
+          <div id={`${caseId}-documents-panel`} role={tabs.length > 1 ? "tabpanel" : undefined}
+            aria-labelledby={tabs.length > 1 ? `${caseId}-documents-tab` : undefined}
+            hidden={visibleTab !== "documents"} className="case-content-panel motion-enter motion-detail">
+            <LeadDocuments leadId={leadId} canUpload={status !== "closed"} role={role}
+              disabled={busy} onBusyChange={(saving) => report("documents", saving)}
+              onAccessLost={onAccessLost} refreshVersion={refreshVersion} />
+          </div>
+        )}
+        {role !== "plaintiff" && (
+          <div id={`${caseId}-notes-panel`} role={tabs.length > 1 ? "tabpanel" : undefined}
+            aria-labelledby={tabs.length > 1 ? `${caseId}-notes-tab` : undefined}
+            hidden={visibleTab !== "notes"} className="case-content-panel motion-enter motion-detail">
+            <Notes key={caseId} caseId={caseId} canWrite={staff && status !== "closed"}
+              disabled={busy} onBusyChange={(saving) => report("notes", saving)}
+              onAccessLost={onAccessLost} refreshVersion={refreshVersion} />
+          </div>
+        )}
+      </div>
     </>
   );
 }
