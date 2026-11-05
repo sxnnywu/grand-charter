@@ -16,14 +16,17 @@ npm run dev
 Open [Grand Charter](http://127.0.0.1:3000). Choose a fictional demo account. Each account uses the password `grand-charter-demo`.
 
 1. Sign in as Maya and submit an **Employment** lead in **Ontario**. That pair routes to Northline Legal.
-2. Use **Switch account** to choose Alex or Priya at Northline. Open the lead from the inbox and accept it. The lead stays under **Accepted**, where you can open the linked case.
-3. Switch back to Maya and open the same case from your request list.
+2. Open the request and upload a sample PDF. Use **Switch account** to choose Alex or Priya at Northline. Open the lead from the inbox and accept it.
+3. Open the linked case under **Accepted**. Start work, share a PDF, and add a private note. Switch back to Maya to see the progress and PDFs.
+4. Switch to Morgan and use **Cases** to find and reassign the case to Harbour. Switch to Sofia at Harbour to see the same case progress and Maya’s PDF. Maya can still open the PDF Northline shared, and Morgan can still inspect Northline’s note.
 
-To try the other review outcome, submit a second Ontario employment lead and choose **Decline lead** in Northline’s inbox. The firm can find it under **Declined**, the plaintiff sees **Awaiting admin review**, and Morgan can find it in the admin queue.
+For the admin queue, submit a **Housing** lead in **Quebec**. Morgan can find and assign it under **Unmatched**. A **Housing** lead in **Ontario** routes directly to Harbour Law. Routing is evaluated when a lead is submitted.
 
-The app persists users, sessions, leads, cases, and audit events in PostgreSQL. Unmatched submissions stay pending and are visible to the demo admin. Admin assignment and closure, case progress updates, PDFs, private notes, and the audit history screen are still to come.
+If a firm declines a lead, Morgan can send it back for review or close it. Maya can see a notice after reassignment or closure. Morgan can open the record to inspect its audit history.
 
-Run `npm run typecheck` or `npm run build` to check the app. Stop the database with `docker compose stop db`. The database volume keeps records between runs.
+The demo uses seeded sign-in and a fixed routing map. Cases move from **Open** to **In progress** to **Closed**. Closed cases are read-only for plaintiffs and firm staff. Admins can still reassign them. PDFs are limited to 10 MB and stored in the private local folder `.data/documents`. Keep that folder and the database volume to retain uploads between runs.
+
+Run `npm run typecheck` or `npm run build` to check the app. Stop the database with `docker compose stop db`.
 
 ## Local prototype
 
