@@ -11,6 +11,7 @@ The [assignment](assignment.md) defines required behavior. This log records choi
 | Plaintiff notices | Show a persistent in-app notice after admin reassignment or closure of a lead. Notifications outside the app are out of scope. |
 | Case progress and reassignment | Use Open, In progress, and Closed. Move the case and its linked lead together and preserve case progress. |
 | PDF sharing | Plaintiffs can upload PDFs before acceptance. Their uploads follow the case. PDFs shared by a former firm stay visible to the plaintiff, who can upload a copy for the new firm if needed. Requests to a former firm are out of scope. |
+| Admin PDF access | Admins can manage assignments and review case records, audit history, and authorized firm notes. PDF access is limited to the plaintiff and eligible firm staff. |
 | Returning firm | If a case returns to a firm, the firm can read the private notes it wrote during an earlier assignment. |
 | Audit history | Record routing and assignment changes, lead acceptance, decline and closure, and case status changes. Identify automatic routing as a system action. |
 
@@ -27,10 +28,6 @@ The draft moves a case from Open to In progress to Closed. Decide whether staff 
 ### Closing unmatched leads
 
 Admins can close declined leads. Decide whether they should also be able to close an unmatched lead before any firm has reviewed it.
-
-### Admin access to PDFs
-
-The brief gives admins cross-firm oversight and access to firm-private notes when authorized. Decide whether admins need to open PDFs as part of that oversight.
 
 ### Inbox filters and search fields
 
