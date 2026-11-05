@@ -4,7 +4,7 @@ import { listLeads, submitLead } from "@/server/leads";
 import { requireUser } from "@/server/session";
 
 export function GET(request: NextRequest) {
-  return api(request, async () => json({ leads: await listLeads(await requireUser(request)) }));
+  return api(request, async () => json(await listLeads(await requireUser(request), request.nextUrl.searchParams)));
 }
 
 export function POST(request: NextRequest) {
