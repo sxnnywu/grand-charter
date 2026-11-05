@@ -1,0 +1,21 @@
+app/case-tools.css
+  s_079498f144b51a::t_68d47a74b98100 72-114,129-137
+app/case-tools.tsx
+  s_079498f144b51a::t_a214608dbce6b2 230-240,307-319,352,355,358-362,431-470
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "cbc1ec953e9d9b05802ff87d1a555570fd22104e",
+  "prompts": {},
+  "sessions": {
+    "s_079498f144b51a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1a8ad-f620-7f02-8c39-3413c6747d65",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Sunny Wu <w.sunny0618@gmail.com>"
+    }
+  }
+}
