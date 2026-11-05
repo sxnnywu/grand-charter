@@ -1,0 +1,47 @@
+README.md
+  s_079498f144b51a::t_e6e4c373ddd7a4 18-37,39-40,44
+app/case-tools.css
+  s_079498f144b51a::t_dad338382b6d1f 22-23,26-33,37,41-50,52-64,76-81,165-184
+app/case-tools.tsx
+  s_079498f144b51a::t_de963420bd17a1 18-19,50-68,208,216,218-220,236-237,248,250,253,256-277,289-291,293,434
+app/globals.css
+  s_079498f144b51a::t_4bd4b271ba95a2 72-78
+app/icon.svg
+  s_079498f144b51a::t_aec897eadfd449 1-7
+app/plaintiff-intake.css
+  s_079498f144b51a::t_0f5ecfa01908f4 1-249
+app/plaintiff-intake.tsx
+  s_079498f144b51a::t_0c15968bae427c 1-157
+app/plaintiff-records.css
+  s_079498f144b51a::t_75563c275651a7 1-243
+app/plaintiff-records.tsx
+  s_079498f144b51a::t_c139aad2e0d443 1-205
+app/plaintiff-shell.css
+  s_079498f144b51a::t_d902fc242f0466 1-139
+app/plaintiff-view.css
+  s_079498f144b51a::t_ef2aa76bff3f18 1-399
+app/plaintiff-view.tsx
+  s_079498f144b51a::t_749393fb53c474 1-184
+app/workspace.tsx
+  s_079498f144b51a::t_1db9768c3bb7c4 8-10,12,241-251,341-349,400-423,430,507,513-517,536,544,549,552,561-570,583,589,596,623,625,649-650,662,677-679,681-685,689,739-745,756-759,764-765,767-768,792-793,812,815-823,825,827,829-830,842-853,856-858,860,909-911,925-937
+db/seed.sql
+  s_079498f144b51a::t_11a199d2b69fef 19-52
+server/documents.ts
+  s_079498f144b51a::t_2bb8e1af51deec 32,42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "559afd87ce2a0e26deff9692cee1dbe4744b5fa9",
+  "prompts": {},
+  "sessions": {
+    "s_079498f144b51a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1a8ad-f620-7f02-8c39-3413c6747d65",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Sunny Wu <w.sunny0618@gmail.com>"
+    }
+  }
+}
