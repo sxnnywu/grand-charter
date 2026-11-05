@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { messageFor, post, request } from "./api-client";
+import { isAccessError, messageFor, post, request } from "./api-client";
 import type { Lead } from "./workspace";
 
 export type Firm = { id: string; name: string };
@@ -52,12 +52,14 @@ function eventChanges(event: AuditEvent) {
   return changes.join(" · ");
 }
 
-export function AdminTools({ lead, caseView, firms, onUpdated, onBusyChange }: {
+export function AdminTools({ lead, caseView, firms, onUpdated, onBusyChange, onAccessLost, refreshVersion }: {
   lead: Lead;
   caseView?: boolean;
   firms: Firm[];
   onUpdated: (lead: Lead, message: string) => void;
   onBusyChange: (busy: boolean) => void;
+  onAccessLost?: () => void;
+  refreshVersion?: number;
 }) {
   const [targetFirm, setTargetFirm] = useState("");
   const [events, setEvents] = useState<AuditEvent[]>();
@@ -75,9 +77,13 @@ export function AdminTools({ lead, caseView, firms, onUpdated, onBusyChange }: {
     const controller = new AbortController();
     request<{ events: AuditEvent[] }>(`/api/leads/${lead.id}/history`, { signal: controller.signal })
       .then(({ events }) => { if (!controller.signal.aborted) setEvents(events); })
-      .catch((error: unknown) => { if (!controller.signal.aborted) setHistoryError(messageFor(error)); });
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        if (isAccessError(error)) onAccessLost?.();
+        else setHistoryError(messageFor(error));
+      });
     return () => controller.abort();
-  }, [lead.id, historyAttempt]);
+  }, [lead.id, historyAttempt, refreshVersion, onAccessLost]);
 
   async function update(path: string, body: Record<string, string>, message: string) {
     setSaving(true);
@@ -90,7 +96,8 @@ export function AdminTools({ lead, caseView, firms, onUpdated, onBusyChange }: {
       setHistoryAttempt((attempt) => attempt + 1);
       onUpdated(lead, message);
     } catch (error) {
-      setActionError(messageFor(error));
+      if (isAccessError(error)) onAccessLost?.();
+      else setActionError(messageFor(error));
     } finally {
       setSaving(false);
       onBusyChange(false);
