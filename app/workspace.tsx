@@ -4,7 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type Reac
 import { categories, regions } from "@/lib/intake-options";
 import { AdminTools, type Firm } from "./admin-tools";
 import { messageFor, post, request } from "./api-client";
-import { CaseTools } from "./case-tools";
+import { CaseTools, LeadDocuments } from "./case-tools";
 import { animateWorkspace, observeScrollReveals, stopWorkspaceTransition } from "./workspace-motion";
 
 type Role = "plaintiff" | "attorney" | "paralegal" | "admin";
@@ -559,7 +559,9 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       <LeadDetail key={lead.id} lead={lead} plaintiff={isPlaintiff} admin={isAdmin}
         decision={action === "submit" ? undefined : action} decideLead={decideLead}
         actionError={actionError} close={() => select()} openCase={selectCase} locked={acting}
-        tools={isAdmin ? <AdminTools lead={lead} firms={firms} onUpdated={updateAssignment} onBusyChange={setChildBusy} /> : undefined} />
+        tools={isAdmin ? <AdminTools lead={lead} firms={firms} onUpdated={updateAssignment} onBusyChange={setChildBusy} /> :
+          !lead.caseId ? <LeadDocuments leadId={lead.id} role={user.role}
+            canUpload={isPlaintiff && lead.status !== "closed"} onBusyChange={setChildBusy} disabled={acting} /> : undefined} />
     ) : (
       <div className="bookshelf-placeholder">
         <button className="subtle-link" onClick={() => select()}><Icon name="back" size={16} />{home}</button>
@@ -937,7 +939,7 @@ function CaseDetail({ id, lead, back, role, locked, onBusyChange, onStatusChange
             </dl>
           </section>
           {plaintiff && <PlaintiffNotices notices={lead.notices} />}
-          <CaseTools caseId={item.id} status={item.status} role={role}
+          <CaseTools caseId={item.id} leadId={item.leadId} status={item.status} role={role}
             onBusyChange={onBusyChange} onStatusChange={(status) => {
               setItem({ ...item, status });
               onStatusChange(status);

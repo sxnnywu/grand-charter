@@ -6,7 +6,15 @@ import "./case-tools.css";
 type Role = "plaintiff" | "attorney" | "paralegal" | "admin";
 type CaseStatus = "open" | "in_progress" | "closed";
 type BusyChange = (busy: boolean) => void;
-type CaseTool = "progress" | "notes";
+type CaseTool = "progress" | "documents" | "notes";
+
+type DocumentRecord = {
+  id: string;
+  fileName: string;
+  uploaderName: string;
+  createdAt: string;
+  size: number;
+};
 
 type FirmNote = {
   id: string;
@@ -29,6 +37,7 @@ const statusCopy: Record<CaseStatus, string> = {
 };
 
 const dateTime = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium", timeStyle: "short" });
+const maxPdfBytes = 10 * 1024 * 1024;
 const maxNoteLength = 2000;
 
 function formatDate(value: string) {
@@ -85,6 +94,104 @@ function LoadError({ error, retry }: { error: string; retry: () => void }) {
       <Feedback error={error} />
       <button className="button small" type="button" onClick={retry}>Try again</button>
     </div>
+  );
+}
+
+function DocumentIcon() {
+  return (
+    <svg aria-hidden="true" width="17" height="17" viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 3h8l4 4v13H6ZM14 3v5h4m-8 5h4m-4 4h4" />
+    </svg>
+  );
+}
+
+export function LeadDocuments({ leadId, canUpload, role, onBusyChange, disabled = false }: {
+  leadId: string;
+  canUpload: boolean;
+  role: Role;
+  onBusyChange?: BusyChange;
+  disabled?: boolean;
+}) {
+  if (role === "admin") return null;
+  return <Documents key={leadId} leadId={leadId} canUpload={canUpload} role={role} disabled={disabled}
+    onBusyChange={onBusyChange} />;
+}
+
+function Documents({ leadId, canUpload, role, disabled, onBusyChange }: {
+  leadId: string;
+  canUpload: boolean;
+  role: Exclude<Role, "admin">;
+  disabled: boolean;
+  onBusyChange?: BusyChange;
+}) {
+  const path = `/api/leads/${leadId}/documents`;
+  const { items, error, retry, add } = useRecords<DocumentRecord>(path, "documents");
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function upload(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (disabled || saving || !items) return;
+    const file = fileInput.current?.files?.[0];
+    if (!file) return;
+    if (file.size > maxPdfBytes) {
+      setFeedback({ error: "Choose a PDF that is 10 MB or smaller." });
+      return;
+    }
+    setSaving(true);
+    setFeedback({});
+    onBusyChange?.(true);
+    try {
+      const body = new FormData();
+      body.set("file", file);
+      const { document } = await request<{ document: DocumentRecord }>(path, { method: "POST", body });
+      add(document);
+      if (fileInput.current) fileInput.current.value = "";
+      setFeedback({ notice: "PDF uploaded." });
+    } catch (failure) {
+      setFeedback({ error: (failure as Error).message });
+    } finally {
+      setSaving(false);
+      onBusyChange?.(false);
+    }
+  }
+
+  return (
+    <section className="detail-section case-tool" aria-label="PDFs">
+      <div>
+        <h3>PDFs</h3>
+        <p className="detail-copy">{role === "plaintiff" ? "Documents you upload and PDFs the firm shares with you."
+          : "Plaintiff uploads and PDFs shared by your firm."}</p>
+      </div>
+      {error ? <LoadError error={error} retry={retry} /> : !items ? <p className="detail-copy" role="status">Loading PDFs…</p> :
+        items.length ? (
+          <ul className="file-list">
+            {items.map((document) => (
+              <li className="file-row" key={document.id}>
+                <span className="document-icon"><DocumentIcon /></span>
+                <div className="case-file-copy">
+                  <a className="subtle-link" href={`/api/documents/${document.id}`} target="_blank" rel="noopener">
+                    {document.fileName}
+                  </a>
+                  <small>{document.uploaderName} · <time dateTime={document.createdAt}>{formatDate(document.createdAt)}</time></small>
+                </div>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="detail-empty">No PDFs have been shared yet.</p>}
+      {canUpload && items && (
+        <form className="case-upload" onSubmit={upload}>
+          <label className="field">
+            <span>Choose a PDF <span className="case-field-hint">(up to 10 MB)</span></span>
+            <input ref={fileInput} type="file" name="file" accept="application/pdf,.pdf" required disabled={disabled || saving} />
+          </label>
+          <button className="button small" type="submit" disabled={disabled || saving}>{saving ? "Uploading…" : "Upload PDF"}</button>
+        </form>
+      )}
+      <Feedback {...feedback} />
+    </section>
   );
 }
 
@@ -156,8 +263,9 @@ function Notes({ caseId, canWrite, disabled, onBusyChange }: {
   );
 }
 
-export function CaseTools({ caseId, status, role, onStatusChange, onBusyChange }: {
+export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusyChange }: {
   caseId: string;
+  leadId: string;
   status: CaseStatus;
   role: Role;
   onStatusChange: (status: CaseStatus) => void;
@@ -234,6 +342,8 @@ export function CaseTools({ caseId, status, role, onStatusChange, onBusyChange }
         )}
         <Feedback {...feedback} />
       </section>
+      <LeadDocuments leadId={leadId} canUpload={status !== "closed"} role={role}
+        disabled={!!action} onBusyChange={(busy) => report("documents", busy)} />
       {role !== "plaintiff" && (
         <Notes key={caseId} caseId={caseId} canWrite={staff && status !== "closed"}
           disabled={!!action} onBusyChange={(busy) => report("notes", busy)} />
