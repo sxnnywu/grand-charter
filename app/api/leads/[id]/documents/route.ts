@@ -8,7 +8,7 @@ export function GET(request: NextRequest, { params }: { params: Promise<{ id: st
   return api(request, async () => {
     const user = await requireUser(request);
     const { id } = await params;
-    return json({ documents: await listDocuments(user, id) });
+    return json(await listDocuments(user, id, request.nextUrl.searchParams.get("before") ?? undefined));
   });
 }
 
