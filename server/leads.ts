@@ -6,32 +6,95 @@ import type { User } from "./session";
 
 const leadColumns = `
   l.id, l.name, l.email, l.category, l.region, l.description, l.status,
-  l.created_at AS "createdAt", c.id AS "caseId", c.status AS "caseStatus", l.firm_id AS "firmId", f.name AS "firmName"
+  l.created_at AS "createdAt", c.id AS "caseId", c.status AS "caseStatus",
+  l.firm_id AS "firmId", f.name AS "firmName"
 `;
 
-export const leadDetails = `
-  SELECT ${leadColumns}
+const leadRelations = `
   FROM leads l LEFT JOIN firms f ON f.id = l.firm_id LEFT JOIN cases c ON c.lead_id = l.id
 `;
+export const leadDetails = `SELECT ${leadColumns} ${leadRelations}`;
 
-function visibleLeads(user: User) {
+function visibleLeads(user: User, alias: "l" | "p" = "l") {
   switch (user.role) {
     case "admin":
       return { clause: "TRUE", values: [] };
     case "plaintiff":
-      return { clause: "l.plaintiff_id = $1", values: [user.id] };
+      return { clause: `${alias}.plaintiff_id = $1`, values: [user.id] };
     default:
-      return { clause: "l.firm_id = $1", values: [user.firmId] };
+      return { clause: `${alias}.firm_id = $1`, values: [user.firmId] };
   }
 }
 
-export async function listLeads(user: User) {
+const pageSize = 50;
+
+async function listRecords(user: User, params: URLSearchParams, casesOnly: boolean) {
   const scope = visibleLeads(user);
+  const clauses = [scope.clause];
+  const values: (string | null)[] = [...scope.values];
+  const parameter = (value: string) => `$${values.push(value)}`;
+
+  if (casesOnly) clauses.push("c.id IS NOT NULL");
+  const status = params.get("status");
+  const region = params.get("region");
+  const category = params.get("category");
+  const before = params.get("before") ?? undefined;
+  if (status) clauses.push(`${casesOnly ? "c" : "l"}.status = ${parameter(status)}`);
+  if (region) clauses.push(`l.region = ${parameter(region)}`);
+  if (category) clauses.push(`l.category = ${parameter(category)}`);
+  if (before) {
+    if (!isUuid(before)) throw new RequestError(400, "Invalid page cursor.");
+    clauses.push(`(l.created_at, l.id) < (
+      SELECT p.created_at, p.id FROM leads p WHERE ${visibleLeads(user, "p").clause} AND p.id = ${parameter(before)}
+    )`);
+  }
+
+  if (user.role === "admin") {
+    const firm = params.get("firmId") ?? undefined;
+    if (firm) {
+      if (!isUuid(firm)) throw new RequestError(400, "Invalid firm.");
+      clauses.push(`l.firm_id = ${parameter(firm)}`);
+    }
+    const query = params.get("q")?.trim().slice(0, 120);
+    if (query) {
+      const namePattern = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
+      if (isUuid(query)) {
+        const id = parameter(query);
+        clauses.push(casesOnly ? `c.id = ${id}` : `(l.id = ${id} OR c.id = ${id})`);
+      } else {
+        clauses.push(`l.name ILIKE ${parameter(namePattern)}`);
+      }
+    }
+  }
+
+  const details = user.role === "plaintiff" ? `
+    SELECT ${leadColumns}, (
+      SELECT json_build_object('id', n.id, 'message', n.message, 'createdAt', n.created_at)
+      FROM plaintiff_notices n WHERE n.lead_id = l.id
+      ORDER BY n.created_at DESC, n.id DESC LIMIT 1
+    ) AS "latestNotice" ${leadRelations}` : leadDetails;
   const { rows } = await db().query(
-    `${leadDetails} WHERE ${scope.clause} ORDER BY l.created_at DESC, l.id DESC`,
-    scope.values,
+    `${details} WHERE ${clauses.join(" AND ")}
+     ORDER BY l.created_at DESC, l.id DESC LIMIT ${pageSize + 1}`,
+    values,
   );
-  return rows;
+  const leads = rows.slice(0, pageSize);
+  return { leads, nextCursor: rows.length > pageSize ? leads.at(-1).id as string : null };
+}
+
+export function listLeads(user: User, params: URLSearchParams) {
+  return listRecords(user, params, false);
+}
+
+export async function listCases(user: User, params: URLSearchParams) {
+  const { leads, nextCursor } = await listRecords(user, params, true);
+  const cases = leads.map((lead) => ({
+    id: lead.caseId,
+    leadId: lead.id,
+    status: lead.caseStatus,
+    lead,
+  }));
+  return { cases, nextCursor };
 }
 
 export async function getLead(user: User, id: string) {
@@ -42,7 +105,13 @@ export async function getLead(user: User, id: string) {
     [...scope.values, id],
   );
   if (!rows[0]) throw new RequestError(404, "Lead not found.");
-  return rows[0];
+  if (user.role !== "plaintiff") return rows[0];
+  const notices = await db().query(
+    `SELECT id, message, created_at AS "createdAt" FROM plaintiff_notices
+     WHERE lead_id = $1 ORDER BY created_at DESC, id DESC`,
+    [id],
+  );
+  return { ...rows[0], notices: notices.rows };
 }
 
 function requiredText(value: unknown, label: string, max: number) {

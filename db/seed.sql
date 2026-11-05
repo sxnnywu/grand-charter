@@ -13,5 +13,6 @@ INSERT INTO users (id, name, email, role, firm_id, is_demo) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO routing_rules (category, region, firm_id) VALUES
-    ('Employment', 'Ontario', '10000000-0000-4000-8000-000000000001')
+    ('Employment', 'Ontario', '10000000-0000-4000-8000-000000000001'),
+    ('Housing', 'Ontario', '10000000-0000-4000-8000-000000000002')
 ON CONFLICT (category, region) DO NOTHING;

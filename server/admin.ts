@@ -142,3 +142,28 @@ export function reassignCase(user: User, id: string, selectedFirmId: unknown) {
     });
   });
 }
+
+export async function leadHistory(user: User, id: string) {
+  assertAdmin(user);
+  if (!isUuid(id)) throw new RequestError(404, "Lead not found.");
+
+  const { rows: [record] } = await db().query<{ events: unknown[] }>(
+    `SELECT COALESCE(jsonb_agg(jsonb_build_object(
+              'id', e.id,
+              'eventType', e.event_type,
+              'actorName', COALESCE(u.name, 'System'),
+              'beforeValues', e.before_values,
+              'afterValues', CASE WHEN routed.name IS NOT NULL
+                THEN jsonb_build_object('firmName', routed.name) || e.after_values
+                ELSE e.after_values END,
+              'createdAt', e.created_at
+            ) ORDER BY e.created_at DESC, e.id DESC) FILTER (WHERE e.id IS NOT NULL), '[]') AS events
+     FROM leads l LEFT JOIN audit_events e ON e.lead_id = l.id
+     LEFT JOIN users u ON u.id = e.actor_user_id
+     LEFT JOIN firms routed ON e.event_type = 'lead_routed' AND routed.id = (e.after_values ->> 'firmId')::uuid
+     WHERE l.id = $1 GROUP BY l.id`,
+    [id],
+  );
+  if (!record) throw new RequestError(404, "Lead not found.");
+  return record.events;
+}
