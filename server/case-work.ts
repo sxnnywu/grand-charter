@@ -1,6 +1,7 @@
 import type { PoolClient } from "pg";
 import { db, transaction } from "./db";
 import { isUuid, RequestError } from "./http";
+import { idempotent, requestHash } from "./idempotency";
 import type { User } from "./session";
 
 type CaseStatus = "open" | "in_progress" | "closed";
@@ -69,7 +70,7 @@ export async function listCaseNotes(user: User, caseId: string) {
   return rows.filter((note) => note.id !== null);
 }
 
-export async function addCaseNote(user: User, caseId: string, body: unknown) {
+export async function addCaseNote(user: User, caseId: string, body: unknown, key: string) {
   const firmId = caseWriter(user, caseId);
   const text = typeof body === "string" ? body.trim() : "";
   if (!text || text.length > 2_000 || text.includes("\0")) {
@@ -78,14 +79,16 @@ export async function addCaseNote(user: User, caseId: string, body: unknown) {
 
   return transaction(async (client) => {
     const current = await lockAssignedCase(client, caseId, firmId);
-    if (current.status === "closed") throw new RequestError(409, "This case is closed.");
-
-    const { rows } = await client.query(
-      `INSERT INTO firm_notes (case_id, author_user_id, firm_id, body)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, body, created_at AS "createdAt"`,
-      [caseId, user.id, firmId, text],
-    );
-    return { ...rows[0], authorName: user.name, firmName: user.firmName };
+    const hash = requestHash({ caseId, firmId, body: text });
+    return idempotent(client, user.id, "case-note.create", key, hash, async () => {
+      if (current.status === "closed") throw new RequestError(409, "This case is closed.");
+      const { rows } = await client.query(
+        `INSERT INTO firm_notes (case_id, author_user_id, firm_id, body)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, body, created_at AS "createdAt"`,
+        [caseId, user.id, firmId, text],
+      );
+      return { ...rows[0], authorName: user.name, firmName: user.firmName };
+    });
   });
 }

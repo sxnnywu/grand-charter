@@ -53,8 +53,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return body;
 }
 
-function jsonRequest(method: "POST" | "PATCH", body: Record<string, string>): RequestInit {
-  return { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+function jsonRequest(method: "POST" | "PATCH", body: Record<string, string>, key?: string): RequestInit {
+  return {
+    method,
+    headers: { "Content-Type": "application/json", ...(key && { "Idempotency-Key": key }) },
+    body: JSON.stringify(body),
+  };
 }
 
 function useRecords<T>(path: string, field: string) {
@@ -130,6 +134,7 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange }: {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
   const fileInput = useRef<HTMLInputElement>(null);
+  const pendingUpload = useRef<{ file: File; key: string } | undefined>(undefined);
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -146,7 +151,11 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange }: {
     try {
       const body = new FormData();
       body.set("file", file);
-      const { document } = await request<{ document: DocumentRecord }>(path, { method: "POST", body });
+      if (pendingUpload.current?.file !== file) pendingUpload.current = { file, key: crypto.randomUUID() };
+      const { document } = await request<{ document: DocumentRecord }>(path, {
+        method: "POST", headers: { "Idempotency-Key": pendingUpload.current.key }, body,
+      });
+      pendingUpload.current = undefined;
       add(document);
       if (fileInput.current) fileInput.current.value = "";
       setFeedback({ notice: "PDF uploaded." });
@@ -206,6 +215,7 @@ function Notes({ caseId, canWrite, disabled, onBusyChange }: {
   const [saving, setSaving] = useState(false);
   const [body, setBody] = useState("");
   const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
+  const pendingNote = useRef<{ body: string; key: string } | undefined>(undefined);
 
   async function addNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -214,7 +224,10 @@ function Notes({ caseId, canWrite, disabled, onBusyChange }: {
     setFeedback({});
     onBusyChange(true);
     try {
-      const { note } = await request<{ note: FirmNote }>(path, jsonRequest("POST", { body }));
+      const text = body.trim();
+      if (pendingNote.current?.body !== text) pendingNote.current = { body: text, key: crypto.randomUUID() };
+      const { note } = await request<{ note: FirmNote }>(path, jsonRequest("POST", { body: text }, pendingNote.current.key));
+      pendingNote.current = undefined;
       add(note);
       setBody("");
       setFeedback({ notice: "Private note added." });
