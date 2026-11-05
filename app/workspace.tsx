@@ -21,6 +21,11 @@ type Lead = {
   caseId: string | null;
   firmName: string | null;
 };
+type Case = Pick<Lead, "id" | "name" | "category" | "region" | "firmName" | "createdAt"> & {
+  leadId: string;
+  status: CaseStatus;
+};
+type LeadResult = { id: string; lead: Lead } | { id: string; error: string };
 
 const statuses: Record<LeadStatus | CaseStatus, [string, string]> = {
   pending_assignment: ["Pending assignment", "pending"],
@@ -80,6 +85,10 @@ function requestTitle(lead: Lead) {
 
 function initials(name: string) {
   return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("");
+}
+
+function focusHeading(heading: HTMLHeadingElement | null) {
+  heading?.focus();
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -212,10 +221,33 @@ function Portal({ user, email, signOut, signingOut, sessionError }: {
   const [leads, setLeads] = useState<Lead[]>();
   const [listError, setListError] = useState("");
   const [listAttempt, setListAttempt] = useState(0);
+  const [selectedId, setSelectedId] = useState<string>();
+  const [leadResult, setLeadResult] = useState<LeadResult>();
+  const [caseId, setCaseId] = useState<string>();
   const [notice, setNotice] = useState("");
   const [acting, setActing] = useState(false);
   const [actionError, setActionError] = useState("");
   const [filter, setFilter] = useState<LeadStatus | "all">(isAdmin ? "all" : "awaiting_firm_review");
+  const currentResult = leadResult?.id === selectedId ? leadResult : undefined;
+  const lead = currentResult && "lead" in currentResult ? currentResult.lead : undefined;
+  const recordError = currentResult && "error" in currentResult ? currentResult.error : undefined;
+
+  useEffect(() => {
+    function restoreRecord() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("lead") || undefined;
+      const linkedCase = params.get("case") || undefined;
+      setSelectedId(id);
+      setCaseId(id ? linkedCase : undefined);
+      setComposing(false);
+      setActionError("");
+      setNotice("");
+      if (!isAdmin && linkedCase) setFilter("accepted");
+    }
+    restoreRecord();
+    window.addEventListener("popstate", restoreRecord);
+    return () => window.removeEventListener("popstate", restoreRecord);
+  }, [isAdmin]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -227,7 +259,35 @@ function Portal({ user, email, signOut, signingOut, sessionError }: {
     return () => controller.abort();
   }, [listAttempt]);
 
+  useEffect(() => {
+    if (!selectedId) return;
+    const controller = new AbortController();
+    request<{ lead: Lead }>(`/api/leads/${encodeURIComponent(selectedId)}`, { signal: controller.signal })
+      .then(({ lead }) => {
+        if (!controller.signal.aborted) setLeadResult({ id: selectedId, lead });
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setLeadResult({ id: selectedId, error: messageFor(error) });
+      });
+    return () => controller.abort();
+  }, [selectedId]);
+
+  function select(id?: string) {
+    if (selectedId !== id) setLeadResult(undefined);
+    setSelectedId(id);
+    setCaseId(undefined);
+    setActionError("");
+    setNotice("");
+    writeRecordUrl(id);
+  }
+
+  function selectCase(id?: string) {
+    setCaseId(id);
+    writeRecordUrl(selectedId, id);
+  }
+
   function showIntake(show: boolean) {
+    select();
     setComposing(show);
   }
 
@@ -241,6 +301,7 @@ function Portal({ user, email, signOut, signingOut, sessionError }: {
         .map((name) => [name, String(form.get(name) ?? "")]));
       const { lead: created } = await post<{ lead: Lead }>("/api/leads", input);
       setLeads((current) => [created, ...(current ?? [])]);
+      select(created.id);
       setComposing(false);
       setNotice("Your request was submitted.");
     } catch (error) {
@@ -249,6 +310,44 @@ function Portal({ user, email, signOut, signingOut, sessionError }: {
       setActing(false);
     }
   }
+
+  async function acceptLead() {
+    if (!lead || acting) return;
+    setActionError("");
+    setActing(true);
+    try {
+      const { caseId } = await request<{ caseId: string }>(`/api/leads/${lead.id}/accept`, { method: "POST" });
+      const accepted: Lead = { ...lead, status: "accepted", caseId };
+      setLeads((current) => current?.map((item) => item.id === lead.id ? accepted : item));
+      setLeadResult({ id: accepted.id, lead: accepted });
+      setFilter("accepted");
+      setNotice("Lead accepted and case opened.");
+    } catch (error) {
+      setActionError(messageFor(error));
+    } finally {
+      setActing(false);
+    }
+  }
+
+  const record = selectedId ? (
+    caseId && lead?.caseId === caseId ?
+      <CaseDetail key={caseId} id={caseId} back={() => selectCase()} plaintiff={isPlaintiff} /> :
+    lead ? (
+      <LeadDetail key={lead.id} lead={lead} plaintiff={isPlaintiff} admin={isAdmin} accepting={acting}
+        acceptLead={acceptLead} actionError={actionError} close={() => select()} openCase={selectCase} />
+    ) : (
+      <div className="bookshelf-placeholder">
+        <button className="subtle-link" onClick={() => select()}><Icon name="back" size={16} />{home}</button>
+        {recordError ? <Message error>{recordError}</Message> : <p role="status">Loading details…</p>}
+      </div>
+    )
+  ) : (
+    <div className="bookshelf-placeholder">
+      <span className="brand-mark"><Icon name={isPlaintiff ? "folio" : "inbox"} size={23} /></span>
+      <h2>{isPlaintiff ? "Choose a request" : "Select a lead"}</h2>
+      <p>{isPlaintiff ? "Open a request to see where it stands." : "Choose a lead from the list to see its details."}</p>
+    </div>
+  );
 
   return (
     <div className="shell">
@@ -300,11 +399,11 @@ function Portal({ user, email, signOut, signingOut, sessionError }: {
                 <button className="subtle-link" onClick={() => { setListError(""); setListAttempt((attempt) => attempt + 1); }}>Try again</button>
               </Message> : !leads ? <Message>Loading {isPlaintiff ? "requests" : "leads"}…</Message> :
                 isPlaintiff ? (
-                  <div className="bookshelf">
+                  <div className={`bookshelf${selectedId ? " has-selection" : ""}`}>
                     <section className="bookshelf-index request-list" aria-labelledby="requests-heading">
                       <div className="card-heading"><h2 id="requests-heading">All requests</h2></div>
                       {leads.length ? leads.map((item) => (
-                        <article key={item.id} className="request-card">
+                        <button key={item.id} className="request-card" aria-pressed={selectedId === item.id} onClick={() => select(item.id)}>
                           <span className="request-icon"><Icon name="file" /></span>
                           <span className="request-copy">
                             <strong className="request-title">{requestTitle(item)}</strong>
@@ -312,12 +411,16 @@ function Portal({ user, email, signOut, signingOut, sessionError }: {
                             <span className="request-meta"><Badge status={item.status}
                               label={item.status === "declined" ? "Awaiting admin review" : undefined} /></span>
                           </span>
-                        </article>
+                          <Icon name="chevron" size={16} />
+                        </button>
                       )) : <p className="empty">You haven’t submitted a request yet.</p>}
                     </section>
+                    {(leads.length > 0 || selectedId) && <section className={`bookshelf-reading${selectedId ? " is-opening" : ""}`}
+                      aria-label="Request details" key={selectedId}>{record}</section>}
                   </div>
                 ) : (
-                  <StaffList leads={leads} admin={isAdmin} filter={filter} changeFilter={setFilter} locked={acting} />
+                  <StaffList leads={leads} selectedId={selectedId} select={select} admin={isAdmin} filter={filter}
+                    changeFilter={(value) => { setFilter(value); select(); }} record={record} locked={acting} />
                 )}
             </div>
           )}
@@ -370,9 +473,9 @@ function Intake({ name, email, submit, cancel, submitting, error }: {
   );
 }
 
-function StaffList({ leads, admin, filter, changeFilter, locked }: {
-  leads: Lead[]; admin: boolean;
-  filter: LeadStatus | "all"; changeFilter: (value: LeadStatus | "all") => void; locked: boolean;
+function StaffList({ leads, selectedId, select, admin, filter, changeFilter, record, locked }: {
+  leads: Lead[]; selectedId?: string; select: (id: string) => void; admin: boolean;
+  filter: LeadStatus | "all"; changeFilter: (value: LeadStatus | "all") => void; record: ReactNode; locked: boolean;
 }) {
   const tabs = admin ? [["all", "All leads"], ["pending_assignment", "Unmatched"]] as const :
     [["awaiting_firm_review", "Active"], ["accepted", "Accepted"]] as const;
@@ -392,7 +495,8 @@ function StaffList({ leads, admin, filter, changeFilter, locked }: {
           <div className="staff-list-label">{filtered.length} {filtered.length === 1 ? "lead" : "leads"}</div>
           {filtered.length ? <div className="staff-rows">
             {filtered.map((item) => (
-              <article key={item.id} className="staff-row">
+              <button key={item.id} className={`staff-row${selectedId === item.id ? " is-selected" : ""}`}
+                aria-pressed={selectedId === item.id} disabled={locked} onClick={() => select(item.id)}>
                 <span className="staff-row-avatar" aria-hidden="true">{initials(item.name)}</span>
                 <span className="staff-row-body">
                   <strong className="staff-row-heading">{item.name}</strong>
@@ -400,12 +504,109 @@ function StaffList({ leads, admin, filter, changeFilter, locked }: {
                   <span className="staff-row-status"><Badge status={item.status} /></span>
                 </span>
                 <span className="staff-row-side"><time dateTime={item.createdAt}>{dateFormat.format(new Date(item.createdAt))}</time>
-                  </span>
-              </article>
+                  <Icon name="chevron" size={15} /></span>
+              </button>
             ))}
           </div> : <div className="empty-state staff-empty"><Icon name="inbox" size={23} /><h3>No leads here yet</h3></div>}
         </section>
+        <section className="staff-detail" aria-label="Lead details" key={selectedId}>{record}</section>
       </div>
     </>
+  );
+}
+
+function LeadDetail({ lead, plaintiff, admin, accepting, acceptLead, actionError, close, openCase }: {
+  lead: Lead; plaintiff: boolean; admin: boolean; accepting: boolean; acceptLead: () => void; actionError: string;
+  close: () => void; openCase: (id: string) => void;
+}) {
+  const title = plaintiff ? requestTitle(lead) : lead.name;
+  const statusMessage = lead.status === "accepted" ? `${lead.firmName ?? "Your firm"} accepted your request and opened a case.` :
+    lead.status === "awaiting_firm_review" ? `${lead.firmName ?? "The assigned firm"} is reviewing your request.` :
+    lead.status === "pending_assignment" ? "Your request is waiting to be assigned to a firm." :
+    lead.status === "declined" ? "Your request is awaiting admin review." : "Your request was closed.";
+  return (
+    <article className={plaintiff ? undefined : "staff-record"}>
+      <header className={plaintiff ? "bookshelf-detail-header" : "detail-header"}>
+        {plaintiff && <button className="subtle-link bookshelf-close" onClick={close}><Icon name="back" size={16} />All requests</button>}
+        <div className={plaintiff ? undefined : "detail-title"}>
+          <h2 className="record-heading" tabIndex={-1} ref={focusHeading}>{title}</h2>
+          {!plaintiff && <Badge status={lead.status} />}
+        </div>
+        <p className={plaintiff ? undefined : "detail-contact"}>{plaintiff ?
+          `${lead.category} · ${lead.region} · Submitted ${dateFormat.format(new Date(lead.createdAt))}` : lead.email}</p>
+      </header>
+      <div className={plaintiff ? "bookshelf-detail-content" : "detail-body"}>
+        {plaintiff && <section className="request-status-message">
+          <div><h3>Where things stand</h3><p>{statusMessage}</p></div>
+        </section>}
+        <section className={plaintiff ? "bookshelf-section" : "detail-section"}>
+          <h3>{plaintiff ? "Your request" : "Original request"}</h3>
+          <p className="detail-copy record-description">{lead.description}</p>
+        </section>
+        {!plaintiff && <dl className="detail-meta">
+          <div><dt>Category</dt><dd>{lead.category}</dd></div>
+          <div><dt>Region</dt><dd>{lead.region}</dd></div>
+          <div><dt>Submitted</dt><dd>{dateFormat.format(new Date(lead.createdAt))}</dd></div>
+          <div><dt>Assigned firm</dt><dd>{lead.firmName ?? "Unassigned"}</dd></div>
+        </dl>}
+        {actionError && <div className="detail-section"><Message error>{actionError}</Message></div>}
+      </div>
+      {lead.caseId ? (
+        <footer className="review-footer" data-review-state="accepted">
+          <div className="review-footer-copy"><strong>Linked case</strong><small>Lead accepted</small></div>
+          <button className="button primary" onClick={() => lead.caseId && openCase(lead.caseId)}>Open case <Icon name="arrow" size={16} /></button>
+        </footer>
+      ) : !plaintiff && !admin && lead.status === "awaiting_firm_review" ? (
+        <footer className="review-footer" data-review-state="review">
+          <div className="review-footer-copy"><strong>Lead decision</strong><small>Accept to open a case.</small></div>
+          <button className="button primary" onClick={acceptLead} disabled={accepting}>
+            <Icon name="check" size={16} />{accepting ? "Accepting…" : "Accept lead"}
+          </button>
+        </footer>
+      ) : null}
+    </article>
+  );
+}
+
+function CaseDetail({ id, back, plaintiff }: { id: string; back: () => void; plaintiff: boolean }) {
+  const [item, setItem] = useState<Case>();
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    request<{ case: Case }>(`/api/cases/${id}`, { signal: controller.signal })
+      .then(({ case: item }) => setItem(item))
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setError(messageFor(error));
+      });
+    return () => controller.abort();
+  }, [id]);
+
+  return (
+    <article>
+      <header className={plaintiff ? "bookshelf-detail-header" : "detail-header"}>
+        <button className="subtle-link" onClick={back}><Icon name="back" size={16} />{plaintiff ? "Back to request" : "Back to lead"}</button>
+        <div className={plaintiff ? undefined : "detail-title"}>
+          <h2 className="record-heading" tabIndex={-1} ref={focusHeading}>{plaintiff ? "Your case" : "Case details"}</h2>
+          {item && <Badge status={item.status} />}
+        </div>
+      </header>
+      <div className={plaintiff ? "bookshelf-detail-content" : "detail-body"}>
+        {error ? <Message error>{error}</Message> : item ? (
+          <section className="detail-section">
+            <h3>Case progress</h3>
+            <p className="detail-copy">{item.status === "open" ? "The firm has opened the case." : statuses[item.status][0]}</p>
+            <dl className="detail-meta">
+              {!plaintiff && <div><dt>Plaintiff</dt><dd>{item.name}</dd></div>}
+              <div><dt>Assigned firm</dt><dd>{item.firmName ?? "Unassigned"}</dd></div>
+              <div><dt>Category</dt><dd>{item.category}</dd></div>
+              <div><dt>Region</dt><dd>{item.region}</dd></div>
+              <div><dt>Opened</dt><dd>{dateFormat.format(new Date(item.createdAt))}</dd></div>
+              <div className="case-reference"><dt>Case reference</dt><dd>{item.id}</dd></div>
+            </dl>
+          </section>
+        ) : <p role="status" className="muted">Loading case…</p>}
+      </div>
+    </article>
   );
 }
