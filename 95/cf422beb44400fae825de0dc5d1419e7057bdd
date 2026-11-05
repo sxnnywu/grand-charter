@@ -1,0 +1,31 @@
+app/case-tools.tsx
+  s_079498f144b51a::t_c637fa4a90ccbd 56-61,137,154-158,218,227-230
+app/api/cases/[id]/notes/route.ts
+  s_079498f144b51a::t_04a2c45b13a97c 5,20
+app/api/leads/[id]/documents/route.ts
+  s_079498f144b51a::t_4e6f40f8a8613e 5,19
+docs/api-routes.md
+  s_079498f144b51a::t_dd00dddf7e0f46 48
+docs/data-model.md
+  s_079498f144b51a::t_c29a9df6af163f 59
+server/case-work.ts
+  s_079498f144b51a::t_51f70e48cc5b76 4,73,82-92
+server/documents.ts
+  s_079498f144b51a::t_9b1679eb931d6b 1,7,93,97-104,115-123,125-140,145
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "95cf422beb44400fae825de0dc5d1419e7057bdd",
+  "prompts": {},
+  "sessions": {
+    "s_079498f144b51a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1a8ad-f620-7f02-8c39-3413c6747d65",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Sunny Wu <w.sunny0618@gmail.com>"
+    }
+  }
+}
