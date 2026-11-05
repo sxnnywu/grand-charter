@@ -1,0 +1,197 @@
+.demo-account-explore {
+  margin-top: 9px;
+  font-size: 12px;
+}
+
+.demo-account-dialog {
+  width: min(820px, calc(100% - 40px));
+  max-height: min(820px, calc(100dvh - 40px));
+  overflow: hidden;
+}
+
+.demo-account-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+body:has(.demo-account-dialog[open]) {
+  overflow: hidden;
+}
+
+.demo-account-guide-heading {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 25px 28px 22px;
+  border-bottom: 1px solid var(--line);
+}
+
+.demo-account-guide-heading h2 {
+  font: 500 31px/1.15 var(--display-font);
+  letter-spacing: -.035em;
+}
+
+.demo-account-guide-heading h2:focus {
+  outline: none;
+}
+
+.demo-account-guide-heading p,
+.demo-account-guide-note,
+.demo-account-guide-footer {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.demo-account-guide-heading p {
+  margin-top: 8px;
+}
+
+.demo-account-guide-heading .icon-button {
+  flex: 0 0 auto;
+}
+
+.demo-account-guide-content {
+  min-height: 0;
+  padding: 20px 28px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.demo-account-guide-note {
+  max-width: 75ch;
+  margin-bottom: 22px;
+}
+
+.demo-account-availability {
+  margin-bottom: 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.demo-account-guide-group + .demo-account-guide-group {
+  margin-top: 20px;
+}
+
+.demo-account-guide-group > h3 {
+  margin-bottom: 5px;
+  color: var(--indigo);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.demo-account-group-note {
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.demo-account-profile {
+  display: grid;
+  grid-template-columns: minmax(130px, .75fr) minmax(0, 1.6fr) auto;
+  align-items: start;
+  gap: 20px;
+  padding: 17px 0;
+  border-top: 1px solid var(--line);
+}
+
+.demo-account-identity h4 {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.demo-account-identity p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.demo-account-selected {
+  display: inline-block;
+  margin-top: 7px;
+  color: var(--indigo);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.demo-account-context {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 18px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.demo-account-context dt {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.demo-account-context dd,
+.demo-account-context ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.demo-account-context li + li {
+  margin-top: 5px;
+}
+
+.demo-account-profile > .button {
+  align-self: center;
+}
+
+.demo-account-guide-footer {
+  flex: 0 0 auto;
+  padding: 13px 28px;
+  border-top: 1px solid var(--line);
+  background: var(--canvas);
+}
+
+@media (max-width: 600px) {
+  .demo-account-dialog {
+    width: calc(100% - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  .demo-account-guide-heading {
+    gap: 12px;
+    padding: 21px 20px 18px;
+  }
+
+  .demo-account-guide-heading h2 {
+    font-size: 27px;
+  }
+
+  .demo-account-guide-content {
+    padding: 18px 20px 8px;
+  }
+
+  .demo-account-profile {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    padding-block: 19px;
+  }
+
+  .demo-account-profile > .button {
+    justify-self: start;
+  }
+
+  .demo-account-context {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .demo-account-guide-footer {
+    padding-inline: 20px;
+  }
+}

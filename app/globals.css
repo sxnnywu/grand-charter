@@ -69,13 +69,6 @@
   font-size: 12px;
 }
 
-.demo-account-hint {
-  margin-top: 8px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.5;
-}
-
 .workspace-message {
   margin-bottom: 16px;
   padding: 10px 12px;

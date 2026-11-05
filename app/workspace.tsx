@@ -5,6 +5,7 @@ import { categories, regions } from "@/lib/intake-options";
 import { AdminTools, type Firm } from "./admin-tools";
 import { isAccessError, messageFor, post, request } from "./api-client";
 import { CaseTools, LeadDocuments } from "./case-tools";
+import { DemoAccountGuide } from "./demo-account-guide";
 import { PlaintiffHome } from "./plaintiff-view";
 import { PlaintiffIntake, RequestSubmitted, type IntakeDraft } from "./plaintiff-intake";
 import { PlaintiffCaseDetail, PlaintiffLeadDetail, type PlaintiffCaseRecord } from "./plaintiff-records";
@@ -129,6 +130,8 @@ function writeRecordUrl(leadId?: string, caseId?: string, replace = false) {
 
 export function Workspace() {
   const [session, setSession] = useState<Session>();
+  const [demoEmail, setDemoEmail] = useState("");
+  const demoAccountSelect = useRef<HTMLSelectElement>(null);
   const [entrySettled, setEntrySettled] = useState(false);
   const [sessionError, setSessionError] = useState("");
   const [sessionAttempt, setSessionAttempt] = useState(0);
@@ -175,6 +178,7 @@ export function Workspace() {
         window.scrollTo(0, 0);
       }
       setSession((current) => current && { ...current, user });
+      setDemoEmail("");
     } catch (error) {
       setSessionError(messageFor(error));
     } finally {
@@ -240,14 +244,20 @@ export function Workspace() {
         <form className="form-stack" onSubmit={signIn} aria-busy={!session && !sessionError}>
           <div>
             <label className="field">Demo account
-              <select name="email" required defaultValue="" aria-describedby="demo-account-hint" disabled={!session || !!sessionAction}>
+              <select ref={demoAccountSelect} name="email" required value={demoEmail}
+                onChange={(event) => setDemoEmail(event.target.value)} disabled={!session || !!sessionAction}>
                 <option value="" disabled>{session ? "Choose an account" : sessionError ? "Accounts unavailable" : "Loading accounts…"}</option>
                 {session?.accounts.map((account) => (
                   <option key={account.id} value={account.email}>{account.name} · {roleName(account)}</option>
                 ))}
               </select>
             </label>
-            <p id="demo-account-hint" className="demo-account-hint">Maya starts with requests and a case. Jordan starts with an empty workspace.</p>
+            <DemoAccountGuide accounts={session?.accounts} unavailable={!!sessionError} disabled={!!sessionAction}
+              selectedEmail={demoEmail} onChoose={(email) => {
+                if (!session?.accounts.some((account) => account.email === email)) return;
+                setDemoEmail(email);
+                requestAnimationFrame(() => demoAccountSelect.current?.focus());
+              }} />
           </div>
           <button className="button primary" disabled={!!sessionAction || (!session && !sessionError) || session?.accounts.length === 0} type="submit">
             {!session && sessionError ? "Try again" : sessionAction ? "Signing in…" : "Sign in"} <Icon name="arrow" size={16} />
