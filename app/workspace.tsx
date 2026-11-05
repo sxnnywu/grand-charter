@@ -2,6 +2,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { categories, regions } from "@/lib/intake-options";
+import { messageFor, post, request } from "./api-client";
 import { animateWorkspace, observeScrollReveals, stopWorkspaceTransition } from "./workspace-motion";
 
 type Role = "plaintiff" | "attorney" | "paralegal" | "admin";
@@ -10,7 +11,10 @@ type User = Omit<Account, "email"> & { firmId: string | null };
 type Session = { user: User | null; accounts: Account[] };
 type LeadStatus = "pending_assignment" | "awaiting_firm_review" | "accepted" | "declined" | "closed";
 type CaseStatus = "open" | "in_progress" | "closed";
-type Lead = {
+type Firm = { id: string; name: string };
+type StaffFilter = LeadStatus | "all" | "cases";
+type PlaintiffNotice = { id: string; message: string; createdAt: string };
+export type Lead = {
   id: string;
   name: string;
   email: string;
@@ -20,13 +24,26 @@ type Lead = {
   status: LeadStatus;
   createdAt: string;
   caseId: string | null;
+  caseStatus: CaseStatus | null;
+  firmId: string | null;
   firmName: string | null;
+  notices?: PlaintiffNotice[];
+  latestNotice?: PlaintiffNotice | null;
 };
 type Case = Pick<Lead, "id" | "name" | "category" | "region" | "firmName" | "createdAt"> & {
   leadId: string;
   status: CaseStatus;
 };
 type LeadResult = { id: string; lead: Lead } | { id: string; error: string };
+type RecordPage = { leads: Lead[]; nextCursor: string | null };
+
+async function loadRecords(path: string, signal: AbortSignal): Promise<RecordPage> {
+  if (path.startsWith("/api/cases")) {
+    const { cases, nextCursor } = await request<{ cases: { lead: Lead }[]; nextCursor: string | null }>(path, { signal });
+    return { leads: cases.map(({ lead }) => lead), nextCursor };
+  }
+  return request<RecordPage>(path, { signal });
+}
 type LeadDecision = "accept" | "decline";
 
 const statuses: Record<LeadStatus | CaseStatus, [string, string]> = {
@@ -92,27 +109,6 @@ function initials(name: string) {
 
 function focusHeading(heading: HTMLHeadingElement | null) {
   heading?.focus({ preventScroll: true });
-}
-
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(path, { cache: "no-store", ...options });
-  const data = await response.json().catch(() => null);
-  if (!response.ok || data === null) {
-    throw new Error(data?.error ?? "The workspace couldn’t finish that request. Try again.");
-  }
-  return data as T;
-}
-
-function post<T>(path: string, body: Record<string, string>) {
-  return request<T>(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-}
-
-function messageFor(error: unknown) {
-  return error instanceof Error ? error.message : "Something went wrong. Try again.";
 }
 
 function writeRecordUrl(leadId?: string, caseId?: string, replace = false) {
@@ -313,19 +309,39 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const [leads, setLeads] = useState<Lead[]>();
   const [listError, setListError] = useState("");
   const [listAttempt, setListAttempt] = useState(0);
+  const [listLoading, setListLoading] = useState(true);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [moreError, setMoreError] = useState("");
+  const [loadingMore, setLoadingMore] = useState(false);
+  const moreRequest = useRef<AbortController | null>(null);
   const [selectedId, setSelectedId] = useState<string>();
   const [leadResult, setLeadResult] = useState<LeadResult>();
   const [caseId, setCaseId] = useState<string>();
   const [notice, setNotice] = useState("");
   const [action, setAction] = useState<LeadDecision | "submit">();
   const [actionError, setActionError] = useState("");
-  const [filter, setFilter] = useState<LeadStatus | "all">(isAdmin ? "all" : "awaiting_firm_review");
+  const [filter, setFilter] = useState<StaffFilter>(isAdmin ? "all" : "awaiting_firm_review");
+  const [region, setRegion] = useState("");
+  const [category, setCategory] = useState("");
+  const [firmFilter, setFirmFilter] = useState("");
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [firms, setFirms] = useState<Firm[]>([]);
+  const [firmsError, setFirmsError] = useState("");
+  const [firmsAttempt, setFirmsAttempt] = useState(0);
   const content = useRef<HTMLDivElement>(null);
   const requestListScroll = useRef<number | null>(null);
   const currentResult = leadResult?.id === selectedId ? leadResult : undefined;
   const lead = currentResult && "lead" in currentResult ? currentResult.lead : undefined;
   const recordError = currentResult && "error" in currentResult ? currentResult.error : undefined;
   const acting = action !== undefined;
+  const parameters = new URLSearchParams();
+  if (!isPlaintiff && filter !== "all" && filter !== "cases") parameters.set("status", filter);
+  if (region) parameters.set("region", region);
+  if (category) parameters.set("category", category);
+  if (firmFilter) parameters.set("firmId", firmFilter);
+  if (query) parameters.set("q", query);
+  const listUrl = `/api/${filter === "cases" ? "cases" : "leads"}?${parameters}`;
 
   useEffect(() => {
     function restoreRecord() {
@@ -359,13 +375,62 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
 
   useEffect(() => {
     const controller = new AbortController();
-    request<{ leads: Lead[] }>("/api/leads", { signal: controller.signal })
-      .then(({ leads }) => setLeads(leads))
+    setListLoading(true);
+    setListError("");
+    setMoreError("");
+    setLoadingMore(false);
+    setNextCursor(null);
+    loadRecords(listUrl, controller.signal)
+      .then(({ leads, nextCursor }) => {
+        if (controller.signal.aborted) return;
+        setLeads(leads);
+        setNextCursor(nextCursor);
+      })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setListError(messageFor(error));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setListLoading(false);
       });
+    return () => {
+      controller.abort();
+      moreRequest.current?.abort();
+      moreRequest.current = null;
+    };
+  }, [listUrl, listAttempt]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const controller = new AbortController();
+    request<{ firms: Firm[] }>("/api/firms", { signal: controller.signal })
+      .then(({ firms }) => { if (!controller.signal.aborted) setFirms(firms); })
+      .catch((error: unknown) => { if (!controller.signal.aborted) setFirmsError(messageFor(error)); });
     return () => controller.abort();
-  }, [listAttempt]);
+  }, [isAdmin, firmsAttempt]);
+
+  async function showMore() {
+    if (!nextCursor || moreRequest.current) return;
+    const controller = new AbortController();
+    moreRequest.current = controller;
+    setLoadingMore(true);
+    setMoreError("");
+    try {
+      const more = await loadRecords(`${listUrl}&before=${nextCursor}`, controller.signal);
+      if (controller.signal.aborted) return;
+      setLeads((current) => {
+        const seen = new Set(current?.map(({ id }) => id));
+        return [...(current ?? []), ...more.leads.filter(({ id }) => !seen.has(id))];
+      });
+      setNextCursor(more.nextCursor);
+    } catch (error) {
+      if (!controller.signal.aborted) setMoreError(messageFor(error));
+    } finally {
+      if (moreRequest.current === controller) {
+        moreRequest.current = null;
+        setLoadingMore(false);
+      }
+    }
+  }
 
   useEffect(() => {
     if (!selectedId) return;
@@ -382,20 +447,20 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     return () => controller.abort();
   }, [selectedId, isPlaintiff, isAdmin]);
 
-  function applySelection(id?: string) {
+  function applySelection(id?: string, linkedCase?: string) {
     if (selectedId !== id) setLeadResult(undefined);
     setSelectedId(id);
-    setCaseId(undefined);
+    setCaseId(linkedCase);
     setActionError("");
     setNotice("");
-    writeRecordUrl(id);
+    writeRecordUrl(id, linkedCase);
   }
 
-  function select(id?: string) {
-    if (selectedId === id && !caseId) return;
+  function select(id?: string, linkedCase?: string) {
+    if (selectedId === id && caseId === linkedCase) return;
     const mobileSheet = isPlaintiff && matchMedia("(max-width: 760px)").matches;
     if (mobileSheet && !selectedId && id) requestListScroll.current = window.scrollY;
-    animateWorkspace(mobileSheet ? "page" : "detail", () => applySelection(id));
+    animateWorkspace(mobileSheet ? "page" : "detail", () => applySelection(id, linkedCase));
   }
 
   function selectCase(id?: string) {
@@ -443,7 +508,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       let updated: Lead;
       if (decision === "accept") {
         const { caseId } = await request<{ caseId: string }>(`/api/leads/${lead.id}/accept`, { method: "POST" });
-        updated = { ...lead, status: "accepted", caseId };
+        updated = { ...lead, status: "accepted", caseId, caseStatus: "open" };
       } else {
         const { lead: declined } = await request<{ lead: Lead }>(`/api/leads/${lead.id}/decline`, { method: "POST" });
         updated = declined;
@@ -459,13 +524,23 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     }
   }
 
+  const pagination = nextCursor || moreError ? (
+    <div className="queue-pagination">
+      {moreError && <Message error>{moreError}</Message>}
+      {nextCursor && <button className="button small" disabled={acting || loadingMore} onClick={showMore}>
+        {loadingMore ? "Loading…" : "Load more"}
+      </button>}
+    </div>
+  ) : null;
+
   const record = selectedId ? (
     caseId && lead?.caseId === caseId ?
-      <CaseDetail key={caseId} id={caseId} back={() => selectCase()} plaintiff={isPlaintiff} /> :
+      <CaseDetail key={caseId} id={caseId} lead={lead} back={() => selectCase()} role={user.role}
+        locked={acting} /> :
     lead ? (
       <LeadDetail key={lead.id} lead={lead} plaintiff={isPlaintiff} admin={isAdmin}
         decision={action === "submit" ? undefined : action} decideLead={decideLead}
-        actionError={actionError} close={() => select()} openCase={selectCase} />
+        actionError={actionError} close={() => select()} openCase={selectCase} locked={acting} />
     ) : (
       <div className="bookshelf-placeholder">
         <button className="subtle-link" onClick={() => select()}><Icon name="back" size={16} />{home}</button>
@@ -526,36 +601,84 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
               <div className={isPlaintiff ? "plaintiff-home" : undefined}>
                 <header className="page-heading split-heading">
                   <div><h1 tabIndex={-1} ref={focusHeading}>{home}</h1><p>{isPlaintiff ? "Track your requests and open your cases." :
-                    isAdmin ? "View leads and their current assignments across firms." : "Review new leads assigned to your firm."}</p></div>
+                    isAdmin ? "Find leads and cases across firms, and manage their assignments." : "Review new leads assigned to your firm."}</p></div>
                   {isPlaintiff && <button className="button primary" onClick={() => showIntake(true)} disabled={!leads || acting}>
                     <Icon name="plus" size={16} />Submit a request
                   </button>}
                 </header>
+                {!isPlaintiff && <div className="queue-filters">
+                  {isAdmin ? (
+                    <>
+                      <form className="queue-search" role="search" onSubmit={(event) => {
+                        event.preventDefault();
+                        setQuery(search.trim());
+                      }}>
+                        <label className="field">Search leads and cases
+                          <input type="search" value={search} placeholder="Plaintiff name or record ID"
+                            maxLength={120} disabled={acting} onChange={(event) => {
+                              setSearch(event.target.value);
+                              if (!event.target.value) setQuery("");
+                            }} />
+                        </label>
+                        <button className="button" type="submit" disabled={acting}>Search</button>
+                        {query && <button className="subtle-link" type="button" disabled={acting}
+                          onClick={() => { setSearch(""); setQuery(""); }}>Clear</button>}
+                      </form>
+                      <label className="field">Firm
+                        <select value={firmFilter} disabled={acting} onChange={(event) => setFirmFilter(event.target.value)}>
+                          <option value="">All firms</option>
+                          {firms.map((firm) => <option key={firm.id} value={firm.id}>{firm.name}</option>)}
+                        </select>
+                      </label>
+                    </>
+                  ) : (
+                    <>
+                      <label className="field">Region
+                        <select value={region} disabled={acting} onChange={(event) => setRegion(event.target.value)}>
+                          <option value="">All regions</option>{regions.map((region) => <option key={region}>{region}</option>)}
+                        </select>
+                      </label>
+                      <label className="field">Category
+                        <select value={category} disabled={acting} onChange={(event) => setCategory(event.target.value)}>
+                          <option value="">All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}
+                        </select>
+                      </label>
+                    </>
+                  )}
+                </div>}
+                {firmsError && <Message error>{firmsError}{" "}
+                  <button className="subtle-link" onClick={() => { setFirmsError(""); setFirmsAttempt((attempt) => attempt + 1); }}>Try again</button>
+                </Message>}
                 {listError ? <Message error>{listError}{" "}
                   <button className="subtle-link" onClick={() => { setListError(""); setListAttempt((attempt) => attempt + 1); }}>Try again</button>
-                </Message> : !leads ? <Message>Loading {isPlaintiff ? "requests" : "leads"}…</Message> :
+                </Message> :
                   isPlaintiff ? (
+                    !leads ? <Message>Loading requests…</Message> :
                     <div className={`bookshelf${selectedId ? " has-selection" : ""}`}>
                       <section className="bookshelf-index request-list" aria-labelledby="requests-heading">
                         <div className="card-heading"><h2 id="requests-heading">All requests</h2></div>
                         {leads.length ? leads.map((item) => (
-                          <button key={item.id} className="request-card" data-reveal="" aria-pressed={selectedId === item.id} onClick={() => select(item.id)}>
+                          <button key={item.id} className="request-card" data-reveal="" aria-pressed={selectedId === item.id}
+                            disabled={acting} onClick={() => select(item.id)}>
                             <span className="request-icon"><Icon name="file" /></span>
                             <span className="request-copy">
                               <strong className="request-title">{requestTitle(item)}</strong>
                               <small>{item.category} · {dateFormat.format(new Date(item.createdAt))}</small>
                               <span className="request-meta"><Badge status={item.status}
                                 label={item.status === "declined" ? "Awaiting admin review" : undefined} /></span>
+                              {item.latestNotice && <small className="plaintiff-notice-preview">{item.latestNotice.message}</small>}
                             </span>
                             <Icon name="chevron" size={16} />
                           </button>
                         )) : <p className="empty">You haven’t submitted a request yet.</p>}
+                        {pagination}
                       </section>
                       {(leads.length > 0 || selectedId) && <section className="bookshelf-reading workspace-record"
                         aria-label="Request details" key={selectedId}>{record}</section>}
                     </div>
                   ) : (
-                    <StaffList leads={leads} selectedId={selectedId} select={select} admin={isAdmin} filter={filter}
+                    <StaffList leads={leads ?? []} selectedId={selectedId} select={select} admin={isAdmin} filter={filter}
+                      loading={listLoading} pagination={pagination}
                       changeFilter={(value) => {
                         if (filter === value) return;
                         setFilter(value);
@@ -614,41 +737,47 @@ function Intake({ name, email, submit, cancel, submitting, error }: {
   );
 }
 
-function StaffList({ leads, selectedId, select, admin, filter, changeFilter, record, locked }: {
-  leads: Lead[]; selectedId?: string; select: (id: string) => void; admin: boolean;
-  filter: LeadStatus | "all"; changeFilter: (value: LeadStatus | "all") => void; record: ReactNode; locked: boolean;
+function StaffList({ leads, selectedId, select, admin, filter, changeFilter, record, locked, loading, pagination }: {
+  leads: Lead[]; selectedId?: string; select: (id: string, caseId?: string) => void; admin: boolean;
+  filter: StaffFilter; changeFilter: (value: StaffFilter) => void; record: ReactNode; locked: boolean;
+  loading: boolean; pagination: ReactNode;
 }) {
-  const tabs = admin ? [["all", "All leads"], ["pending_assignment", "Unmatched"], ["declined", "Declined"]] as const :
+  const tabs = admin ? [["all", "All leads"], ["pending_assignment", "Unmatched"], ["declined", "Declined"], ["cases", "Cases"]] as const :
     [["awaiting_firm_review", "Active"], ["accepted", "Accepted"], ["declined", "Declined"]] as const;
-  const filtered = leads.filter((lead) => filter === "all" || lead.status === filter);
+  const noun = filter === "cases" ? "case" : "lead";
+  const visible = filter === "cases" ? leads.filter(({ caseId }) => !!caseId) :
+    leads.filter(({ status }) => filter === "all" || status === filter);
   return (
     <>
       <nav className="staff-tabs" aria-label="Lead views">
         {tabs.map(([value, title]) => (
           <button key={value} className={`staff-tab${filter === value ? " is-active" : ""}`} aria-pressed={filter === value}
             disabled={locked} onClick={() => changeFilter(value)}>
-            {title}<span className="tab-count">{value === "all" ? leads.length : leads.filter((item) => item.status === value).length}</span>
+            {title}
           </button>
         ))}
       </nav>
       <div className="staff-workspace">
-        <section className="staff-list" aria-label="Leads">
-          <div className="staff-list-label">{filtered.length} {filtered.length === 1 ? "lead" : "leads"}</div>
-          {filtered.length ? <div className="staff-rows motion-enter motion-detail" key={filter}>
-            {filtered.map((item) => (
+        <section className="staff-list" aria-label={filter === "cases" ? "Cases" : "Leads"}>
+          <div className="staff-list-label">{loading ? `Loading ${noun}s…` :
+            `${visible.length} ${noun}${visible.length === 1 ? "" : "s"} shown`}</div>
+          {!loading && (visible.length ? <div className="staff-rows motion-enter motion-detail" key={filter}>
+            {visible.map((item) => (
               <button key={item.id} data-reveal="" className={`staff-row${selectedId === item.id ? " is-selected" : ""}`}
-                aria-pressed={selectedId === item.id} disabled={locked} onClick={() => select(item.id)}>
+                aria-pressed={selectedId === item.id} disabled={locked}
+                onClick={() => select(item.id, filter === "cases" ? item.caseId ?? undefined : undefined)}>
                 <span className="staff-row-avatar" aria-hidden="true">{initials(item.name)}</span>
                 <span className="staff-row-body">
                   <strong className="staff-row-heading">{item.name}</strong>
                   <span className="staff-row-meta">{item.category} · {item.region}</span>
-                  <span className="staff-row-status"><Badge status={item.status} /></span>
+                  <span className="staff-row-status"><Badge status={filter === "cases" ? item.caseStatus ?? item.status : item.status} /></span>
                 </span>
                 <span className="staff-row-side"><time dateTime={item.createdAt}>{dateFormat.format(new Date(item.createdAt))}</time>
                   <Icon name="chevron" size={15} /></span>
               </button>
             ))}
-          </div> : <div className="empty-state staff-empty"><Icon name="inbox" size={23} /><h3>No leads here yet</h3></div>}
+          </div> : <div className="empty-state staff-empty"><Icon name="inbox" size={23} /><h3>No {noun}s match this view</h3></div>)}
+          {!loading && pagination}
         </section>
         <section className="staff-detail workspace-record" aria-label="Lead details" key={selectedId}>{record}</section>
       </div>
@@ -656,10 +785,11 @@ function StaffList({ leads, selectedId, select, admin, filter, changeFilter, rec
   );
 }
 
-function LeadDetail({ lead, plaintiff, admin, decision, decideLead, actionError, close, openCase }: {
+function LeadDetail({ lead, plaintiff, admin, decision, decideLead, actionError, close, openCase, tools, locked }: {
   lead: Lead; plaintiff: boolean; admin: boolean; decision?: LeadDecision;
   decideLead: (decision: LeadDecision) => void; actionError: string;
   close: () => void; openCase: (id: string) => void;
+  tools?: ReactNode; locked: boolean;
 }) {
   const declineDialog = useRef<HTMLDialogElement>(null);
   const title = plaintiff ? requestTitle(lead) : lead.name;
@@ -670,7 +800,7 @@ function LeadDetail({ lead, plaintiff, admin, decision, decideLead, actionError,
   return (
     <article className={`motion-enter motion-detail${plaintiff ? "" : " staff-record"}`}>
       <header className={plaintiff ? "bookshelf-detail-header" : "detail-header"}>
-        {plaintiff && <button className="subtle-link bookshelf-close" onClick={close}><Icon name="back" size={16} />All requests</button>}
+        {plaintiff && <button className="subtle-link bookshelf-close" disabled={locked} onClick={close}><Icon name="back" size={16} />All requests</button>}
         <div className={plaintiff ? undefined : "detail-title"}>
           <h2 className="record-heading" tabIndex={-1} ref={focusHeading}>{title}</h2>
           {!plaintiff && <Badge status={lead.status} />}
@@ -682,6 +812,7 @@ function LeadDetail({ lead, plaintiff, admin, decision, decideLead, actionError,
         {plaintiff && <section className="request-status-message">
           <div><h3>Where things stand</h3><p>{statusMessage}</p></div>
         </section>}
+        {plaintiff && <PlaintiffNotices notices={lead.notices} />}
         <section className={plaintiff ? "bookshelf-section" : "detail-section"}>
           <h3>{plaintiff ? "Your request" : "Original request"}</h3>
           <p className="detail-copy record-description">{lead.description}</p>
@@ -693,20 +824,21 @@ function LeadDetail({ lead, plaintiff, admin, decision, decideLead, actionError,
           <div><dt>Assigned firm</dt><dd>{lead.firmName ?? "Unassigned"}</dd></div>
         </dl>}
         {actionError && <div className="detail-section"><Message error>{actionError}</Message></div>}
+        {tools}
       </div>
       {lead.caseId ? (
         <footer className="review-footer motion-enter motion-feedback" data-review-state="accepted" key="accepted">
           <div className="review-footer-copy"><strong>Linked case</strong><small>Lead accepted</small></div>
-          <button className="button primary" onClick={() => lead.caseId && openCase(lead.caseId)}>Open case <Icon name="arrow" size={16} /></button>
+          <button className="button primary" disabled={locked} onClick={() => lead.caseId && openCase(lead.caseId)}>Open case <Icon name="arrow" size={16} /></button>
         </footer>
       ) : !plaintiff && !admin && lead.status === "awaiting_firm_review" ? (
         <footer className="review-footer" data-review-state="review" key="review">
           <div className="review-footer-copy"><strong>Lead decision</strong><small>Accept to open a case or decline for admin review.</small></div>
           <div className="detail-actions">
-            <button className="button danger" onClick={() => declineDialog.current?.showModal()} disabled={!!decision}>
+            <button className="button danger" onClick={() => declineDialog.current?.showModal()} disabled={locked}>
               {decision === "decline" ? "Declining…" : "Decline lead"}
             </button>
-            <button className="button primary" onClick={() => decideLead("accept")} disabled={!!decision}>
+            <button className="button primary" onClick={() => decideLead("accept")} disabled={locked}>
               <Icon name="check" size={16} />{decision === "accept" ? "Accepting…" : "Accept lead"}
             </button>
           </div>
@@ -733,7 +865,21 @@ function LeadDetail({ lead, plaintiff, admin, decision, decideLead, actionError,
   );
 }
 
-function CaseDetail({ id, back, plaintiff }: { id: string; back: () => void; plaintiff: boolean }) {
+function PlaintiffNotices({ notices }: { notices?: PlaintiffNotice[] }) {
+  if (!notices?.length) return null;
+  return <section className="detail-section plaintiff-notices">
+    <h3>Assignment updates</h3>
+    {notices.map((notice) => <div className="notice" key={notice.id}>
+      <p>{notice.message}</p>
+      <small><time dateTime={notice.createdAt}>{dateFormat.format(new Date(notice.createdAt))}</time></small>
+    </div>)}
+  </section>;
+}
+
+function CaseDetail({ id, lead, back, role, locked }: {
+  id: string; lead: Lead; back: () => void; role: Role; locked: boolean;
+}) {
+  const plaintiff = role === "plaintiff";
   const [item, setItem] = useState<Case>();
   const [error, setError] = useState("");
 
@@ -750,7 +896,7 @@ function CaseDetail({ id, back, plaintiff }: { id: string; back: () => void; pla
   return (
     <article className="motion-enter motion-detail">
       <header className={plaintiff ? "bookshelf-detail-header" : "detail-header"}>
-        <button className="subtle-link" onClick={back}><Icon name="back" size={16} />{plaintiff ? "Back to request" : "Back to lead"}</button>
+        <button className="subtle-link" disabled={locked} onClick={back}><Icon name="back" size={16} />{plaintiff ? "Back to request" : "Back to lead"}</button>
         <div className={plaintiff ? undefined : "detail-title"}>
           <h2 className="record-heading" tabIndex={-1} ref={focusHeading}>{plaintiff ? "Your case" : "Case details"}</h2>
           {item && <Badge status={item.status} />}
@@ -758,18 +904,20 @@ function CaseDetail({ id, back, plaintiff }: { id: string; back: () => void; pla
       </header>
       <div className={plaintiff ? "bookshelf-detail-content" : "detail-body"}>
         {error ? <Message error>{error}</Message> : item ? (
+          <>
           <section className="detail-section motion-enter motion-detail">
-            <h3>Case progress</h3>
-            <p className="detail-copy">{item.status === "open" ? "The firm has opened the case." : statuses[item.status][0]}</p>
+            <h3>Case overview</h3>
             <dl className="detail-meta">
               {!plaintiff && <div><dt>Plaintiff</dt><dd>{item.name}</dd></div>}
-              <div><dt>Assigned firm</dt><dd>{item.firmName ?? "Unassigned"}</dd></div>
+              <div><dt>Assigned firm</dt><dd>{lead.firmName ?? item.firmName ?? "Unassigned"}</dd></div>
               <div><dt>Category</dt><dd>{item.category}</dd></div>
               <div><dt>Region</dt><dd>{item.region}</dd></div>
               <div><dt>Opened</dt><dd>{dateFormat.format(new Date(item.createdAt))}</dd></div>
               <div className="case-reference"><dt>Case reference</dt><dd>{item.id}</dd></div>
             </dl>
           </section>
+          {plaintiff && <PlaintiffNotices notices={lead.notices} />}
+          </>
         ) : <p role="status" className="muted">Loading case…</p>}
       </div>
     </article>

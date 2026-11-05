@@ -65,6 +65,43 @@
   margin-top: 14px;
 }
 
+.queue-filters, .queue-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px;
+}
+
+.queue-filters {
+  margin-bottom: 18px;
+}
+
+.queue-search {
+  flex: 1 1 340px;
+}
+
+.queue-search .field {
+  flex: 1 1 190px;
+}
+
+.queue-filters select {
+  min-width: 145px;
+}
+
+.queue-pagination {
+  padding: 10px 12px;
+}
+
+.plaintiff-notices {
+  display: grid;
+  gap: 8px;
+}
+
+.request-copy .plaintiff-notice-preview {
+  margin-top: 4px;
+  color: var(--indigo);
+}
+
 .portal-page > .subtle-link {
   margin-bottom: 15px;
 }
