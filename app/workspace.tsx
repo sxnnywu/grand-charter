@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type Reac
 import { categories, regions } from "@/lib/intake-options";
 import { AdminTools, type Firm } from "./admin-tools";
 import { messageFor, post, request } from "./api-client";
+import { CaseTools } from "./case-tools";
 import { animateWorkspace, observeScrollReveals, stopWorkspaceTransition } from "./workspace-motion";
 
 type Role = "plaintiff" | "attorney" | "paralegal" | "admin";
@@ -532,6 +533,13 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     setNotice(message);
   }
 
+  function updateCaseStatus(status: CaseStatus) {
+    if (!lead) return;
+    const updated = { ...lead, caseStatus: status };
+    setLeadResult({ id: updated.id, lead: updated });
+    setLeads((current) => current?.map((item) => item.id === updated.id ? updated : item));
+  }
+
   const pagination = nextCursor || moreError ? (
     <div className="queue-pagination">
       {moreError && <Message error>{moreError}</Message>}
@@ -544,7 +552,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const record = selectedId ? (
     caseId && lead?.caseId === caseId ?
       <CaseDetail key={caseId} id={caseId} lead={lead} back={() => selectCase()} role={user.role}
-        locked={acting}
+        locked={acting} onBusyChange={setChildBusy} onStatusChange={updateCaseStatus}
         adminTools={isAdmin ? <AdminTools lead={lead} caseView firms={firms} onUpdated={updateAssignment}
           onBusyChange={setChildBusy} /> : undefined} /> :
     lead ? (
@@ -887,9 +895,9 @@ function PlaintiffNotices({ notices }: { notices?: PlaintiffNotice[] }) {
   </section>;
 }
 
-function CaseDetail({ id, lead, back, role, locked, adminTools }: {
+function CaseDetail({ id, lead, back, role, locked, onBusyChange, onStatusChange, adminTools }: {
   id: string; lead: Lead; back: () => void; role: Role; locked: boolean;
-  adminTools?: ReactNode;
+  onBusyChange: (busy: boolean) => void; onStatusChange: (status: CaseStatus) => void; adminTools?: ReactNode;
 }) {
   const plaintiff = role === "plaintiff";
   const [item, setItem] = useState<Case>();
@@ -929,6 +937,11 @@ function CaseDetail({ id, lead, back, role, locked, adminTools }: {
             </dl>
           </section>
           {plaintiff && <PlaintiffNotices notices={lead.notices} />}
+          <CaseTools caseId={item.id} status={item.status} role={role}
+            onBusyChange={onBusyChange} onStatusChange={(status) => {
+              setItem({ ...item, status });
+              onStatusChange(status);
+            }} />
           {adminTools}
           </>
         ) : <p role="status" className="muted">Loading case…</p>}
