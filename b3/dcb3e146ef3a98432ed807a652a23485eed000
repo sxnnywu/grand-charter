@@ -1,0 +1,37 @@
+prototype/state.js
+  s_079498f144b51a::t_132481c761cad7 1-372
+README.md
+  s_079498f144b51a::t_bc17abd21d04ec 2-13
+prototype/icons.js
+  s_079498f144b51a::t_661e66e7a90a09 1-41
+prototype/index.html
+  s_079498f144b51a::t_661e66e7a90a09 1-16
+prototype/staff.js
+  s_079498f144b51a::t_d5ffe061ea76cc 86,104
+  s_079498f144b51a::t_bc17abd21d04ec 82-83,91
+  s_079498f144b51a::t_b4d00f17f3fa37 1-81,84-85,87-90,92-103,105-195,197-228
+  s_079498f144b51a::t_a8d9313d4b1a62 196
+prototype/app.js
+  s_079498f144b51a::t_bc17abd21d04ec 206,250,353
+  s_079498f144b51a::t_661e66e7a90a09 1-205,207-249,251-352,354-480
+prototype/styles.css
+  s_079498f144b51a::t_dc23bdd4e0150f 56-57,59-60,134-135,137,150,181-182,244-245,345-346,351,365,398,400,403,405-406,408-409,411-412,513-514,525,642,698
+  s_079498f144b51a::t_eff4826cf11f4e 1-55,58,61-133,136,138-149,151-180,183-243,246-344,347-350,352-364,366-397,399,401-402,404,407,410,413-484
+  s_079498f144b51a::t_1e82eb87e6df1b 485-512,515-524,526-641,643-697,699-700
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "b3dcb3e146ef3a98432ed807a652a23485eed000",
+  "prompts": {},
+  "sessions": {
+    "s_079498f144b51a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1a8ad-f620-7f02-8c39-3413c6747d65",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Sunny Wu <w.sunny0618@gmail.com>"
+    }
+  }
+}
