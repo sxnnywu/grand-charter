@@ -1,0 +1,66 @@
+@import "../prototype/styles.css";
+
+.demo-entry {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  padding: 24px 16px;
+}
+
+.demo-entry-card {
+  width: min(100%, 440px);
+  padding: clamp(22px, 5vw, 36px);
+}
+
+.demo-entry-card .brand {
+  margin: 0 0 24px;
+}
+
+.demo-entry-card .page-heading {
+  margin-bottom: 22px;
+}
+
+.demo-entry-card .page-heading h1 {
+  font-size: clamp(29px, 5vw, 38px);
+}
+
+.demo-entry-card .button {
+  justify-self: start;
+}
+
+.demo-notice {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workspace-message {
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: var(--paper);
+}
+
+.workspace-error {
+  border-color: #e7c3c6;
+  color: var(--danger);
+}
+
+.record-heading:focus {
+  outline: none;
+}
+
+.record-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.case-reference {
+  overflow-wrap: anywhere;
+}
+
+.demo-guide .notice {
+  margin-top: 14px;
+}
