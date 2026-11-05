@@ -6,10 +6,10 @@ import type { User } from "./session";
 
 const leadColumns = `
   l.id, l.name, l.email, l.category, l.region, l.description, l.status,
-  l.created_at AS "createdAt", c.id AS "caseId", f.name AS "firmName"
+  l.created_at AS "createdAt", c.id AS "caseId", c.status AS "caseStatus", l.firm_id AS "firmId", f.name AS "firmName"
 `;
 
-const leadDetails = `
+export const leadDetails = `
   SELECT ${leadColumns}
   FROM leads l LEFT JOIN firms f ON f.id = l.firm_id LEFT JOIN cases c ON c.lead_id = l.id
 `;
