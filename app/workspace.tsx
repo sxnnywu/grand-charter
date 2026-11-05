@@ -81,7 +81,7 @@ function Icon({ name, size = 18 }: { name: keyof typeof glyphs; size?: number })
 }
 
 function Brand() {
-  return <div className="brand"><span className="brand-mark"><Icon name="folio" size={23} /></span>Grand Charter</div>;
+  return <div className="brand"><span className="brand-mark"><Icon name="folio" size={23} /></span>Brief</div>;
 }
 
 function Badge({ status, label }: { status: LeadStatus | CaseStatus; label?: string }) {
@@ -219,14 +219,15 @@ export function Workspace() {
 
   return (
     <main className="demo-entry" data-settled={entrySettled || undefined}
-      onFocusCapture={() => setEntrySettled(true)} onPointerDownCapture={() => setEntrySettled(true)}>
+      onFocusCapture={(event) => {
+        if (event.target.matches(":focus-visible")) setEntrySettled(true);
+      }} onClickCapture={() => setEntrySettled(true)}>
       <section className="panel demo-entry-card" aria-labelledby="demo-heading" onAnimationEnd={(event) => {
         if (event.animationName === "sign-in-arrive") setEntrySettled(true);
       }}>
-        <Brand />
         <header className="page-heading">
-          <h1 id="demo-heading">Sign in to the demo</h1>
-          <p>Choose a demo account to try the workspace.</p>
+          <h1 id="demo-heading" className="sign-in-brand"><span className="brand-mark"><Icon name="folio" size={23} /></span>Brief</h1>
+          <p>Connecting people seeking legal help with law firms.</p>
         </header>
         {sessionError && <Message error>{sessionError}</Message>}
         <p className="visually-hidden" role="status">
@@ -884,7 +885,7 @@ function Intake({ name, email, submit, cancel, submitting, error }: {
           </div>
         </form>
         <aside className="panel demo-guide">
-          <div className="intake-folio"><span className="brand-mark"><Icon name="folio" size={23} /></span>Grand Charter</div>
+          <div className="intake-folio"><span className="brand-mark"><Icon name="folio" size={23} /></span>Brief</div>
           <h2>Try a routed request</h2>
           <p className="notice">Choose Ontario and Employment to send your request to Northline Legal.</p>
         </aside>

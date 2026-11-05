@@ -45,8 +45,10 @@
   box-shadow: 0 8px 28px #282c3710;
 }
 
-.demo-entry-card .brand {
-  margin: 0 0 24px;
+.demo-entry-card .sign-in-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .demo-entry-card .page-heading {
@@ -314,12 +316,8 @@
     animation: sign-in-arrive 650ms 100ms cubic-bezier(.2, .75, .3, 1) backwards;
   }
 
-  .demo-entry:not([data-settled]) .demo-entry-card > .brand {
-    animation: sign-in-content 260ms 310ms ease-out backwards;
-  }
-
   .demo-entry:not([data-settled]) .demo-entry-card > .page-heading {
-    animation: sign-in-content 260ms 375ms ease-out backwards;
+    animation: sign-in-content 260ms 310ms ease-out backwards;
   }
 
   .demo-entry:not([data-settled]) .demo-entry-card > :is(.form-stack, .demo-notice) {
