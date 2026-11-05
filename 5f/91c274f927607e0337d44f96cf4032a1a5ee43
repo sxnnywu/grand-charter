@@ -1,0 +1,20 @@
+docs/data-model.md
+  s_079498f144b51a::t_30a950246d1384 1-2,4-28,38-56
+  s_079498f144b51a::t_f1d012f4c7c80a 3,29-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5f91c274f927607e0337d44f96cf4032a1a5ee43",
+  "prompts": {},
+  "sessions": {
+    "s_079498f144b51a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1a8ad-f620-7f02-8c39-3413c6747d65",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Sunny Wu <w.sunny0618@gmail.com>"
+    }
+  }
+}
