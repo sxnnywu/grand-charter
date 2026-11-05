@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { categories, regions } from "@/lib/intake-options";
+import { animateWorkspace, observeScrollReveals, stopWorkspaceTransition } from "./workspace-motion";
 
 type Role = "plaintiff" | "attorney" | "paralegal" | "admin";
 type Account = { id: string; name: string; email: string; role: Role; firmName: string | null };
@@ -69,7 +70,7 @@ function Badge({ status, label }: { status: LeadStatus | CaseStatus; label?: str
 }
 
 function Message({ children, error = false }: { children: ReactNode; error?: boolean }) {
-  return <div role={error ? "alert" : "status"} className={`workspace-message${error ? " workspace-error" : ""}`}>{children}</div>;
+  return <div role={error ? "alert" : "status"} className={`workspace-message motion-enter motion-feedback${error ? " workspace-error" : ""}`}>{children}</div>;
 }
 
 function roleName(user: Pick<User, "role" | "firmName">) {
@@ -89,7 +90,7 @@ function initials(name: string) {
 }
 
 function focusHeading(heading: HTMLHeadingElement | null) {
-  heading?.focus();
+  heading?.focus({ preventScroll: true });
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -144,6 +145,7 @@ export function Workspace() {
   async function startSession(email: string, action: "sign-in" | "switch") {
     if (sessionBusy.current) return;
     sessionBusy.current = true;
+    stopWorkspaceTransition();
     setSessionError("");
     setSessionAction(action);
     try {
@@ -173,6 +175,7 @@ export function Workspace() {
   async function signOut() {
     if (sessionBusy.current) return;
     sessionBusy.current = true;
+    stopWorkspaceTransition();
     setSessionError("");
     setSessionAction("sign-out");
     try {
@@ -196,7 +199,7 @@ export function Workspace() {
 
   return (
     <main className="demo-entry">
-      <section className="panel demo-entry-card" aria-labelledby="demo-heading">
+      <section className="panel demo-entry-card motion-enter" aria-labelledby="demo-heading">
         <Brand />
         <header className="page-heading">
           <h1 id="demo-heading">Sign in to the demo</h1>
@@ -316,6 +319,8 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const [acting, setActing] = useState(false);
   const [actionError, setActionError] = useState("");
   const [filter, setFilter] = useState<LeadStatus | "all">(isAdmin ? "all" : "awaiting_firm_review");
+  const content = useRef<HTMLDivElement>(null);
+  const requestListScroll = useRef<number | null>(null);
   const currentResult = leadResult?.id === selectedId ? leadResult : undefined;
   const lead = currentResult && "lead" in currentResult ? currentResult.lead : undefined;
   const recordError = currentResult && "error" in currentResult ? currentResult.error : undefined;
@@ -333,9 +338,22 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       if (!isAdmin && linkedCase) setFilter("accepted");
     }
     restoreRecord();
-    window.addEventListener("popstate", restoreRecord);
-    return () => window.removeEventListener("popstate", restoreRecord);
+    const onHistory = () => animateWorkspace("page", restoreRecord);
+    window.addEventListener("popstate", onHistory);
+    return () => window.removeEventListener("popstate", onHistory);
   }, [isAdmin]);
+
+  useEffect(() => observeScrollReveals(content.current), [leads, filter, composing, selectedId]);
+
+  useLayoutEffect(() => {
+    if (!isPlaintiff || !matchMedia("(max-width: 760px)").matches) return;
+    if (selectedId) {
+      window.scrollTo(0, 0);
+    } else if (requestListScroll.current !== null) {
+      window.scrollTo(0, requestListScroll.current);
+      requestListScroll.current = null;
+    }
+  }, [isPlaintiff, selectedId, caseId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -360,7 +378,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     return () => controller.abort();
   }, [selectedId]);
 
-  function select(id?: string) {
+  function applySelection(id?: string) {
     if (selectedId !== id) setLeadResult(undefined);
     setSelectedId(id);
     setCaseId(undefined);
@@ -369,14 +387,27 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     writeRecordUrl(id);
   }
 
+  function select(id?: string) {
+    if (selectedId === id && !caseId) return;
+    const mobileSheet = isPlaintiff && matchMedia("(max-width: 760px)").matches;
+    if (mobileSheet && !selectedId && id) requestListScroll.current = window.scrollY;
+    animateWorkspace(mobileSheet ? "page" : "detail", () => applySelection(id));
+  }
+
   function selectCase(id?: string) {
-    setCaseId(id);
-    writeRecordUrl(selectedId, id);
+    animateWorkspace("detail", () => {
+      setCaseId(id);
+      writeRecordUrl(selectedId, id);
+    });
   }
 
   function showIntake(show: boolean) {
-    select();
-    setComposing(show);
+    if (show === composing && !selectedId) return;
+    animateWorkspace("page", () => {
+      applySelection();
+      setComposing(show);
+      window.scrollTo(0, 0);
+    });
   }
 
   async function submitLead(event: FormEvent<HTMLFormElement>) {
@@ -389,7 +420,8 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
         .map((name) => [name, String(form.get(name) ?? "")]));
       const { lead: created } = await post<{ lead: Lead }>("/api/leads", input);
       setLeads((current) => [created, ...(current ?? [])]);
-      select(created.id);
+      applySelection(created.id);
+      setLeadResult({ id: created.id, lead: created });
       setComposing(false);
       setNotice("Your request was submitted.");
     } catch (error) {
@@ -472,50 +504,56 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
             </button>
           </div>
         </header>
-        <div className="content" inert={!!sessionAction}>
+        <div className="content motion-enter" ref={content} inert={!!sessionAction}>
           {sessionError && <Message error>{sessionError}</Message>}
           {notice && <Message>{notice}</Message>}
-          {composing ? (
-            <Intake name={user.name} email={email} submit={submitLead} cancel={() => showIntake(false)}
-              submitting={acting} error={actionError} />
-          ) : (
-            <div className={isPlaintiff ? "plaintiff-home" : undefined}>
-              <header className="page-heading split-heading">
-                <div><h1>{home}</h1><p>{isPlaintiff ? "Track your requests and open your cases." :
-                  isAdmin ? "View leads and their current assignments across firms." : "Review new leads assigned to your firm."}</p></div>
-                {isPlaintiff && <button className="button primary" onClick={() => showIntake(true)} disabled={!leads || acting}>
-                  <Icon name="plus" size={16} />Submit a request
-                </button>}
-              </header>
-              {listError ? <Message error>{listError}{" "}
-                <button className="subtle-link" onClick={() => { setListError(""); setListAttempt((attempt) => attempt + 1); }}>Try again</button>
-              </Message> : !leads ? <Message>Loading {isPlaintiff ? "requests" : "leads"}…</Message> :
-                isPlaintiff ? (
-                  <div className={`bookshelf${selectedId ? " has-selection" : ""}`}>
-                    <section className="bookshelf-index request-list" aria-labelledby="requests-heading">
-                      <div className="card-heading"><h2 id="requests-heading">All requests</h2></div>
-                      {leads.length ? leads.map((item) => (
-                        <button key={item.id} className="request-card" aria-pressed={selectedId === item.id} onClick={() => select(item.id)}>
-                          <span className="request-icon"><Icon name="file" /></span>
-                          <span className="request-copy">
-                            <strong className="request-title">{requestTitle(item)}</strong>
-                            <small>{item.category} · {dateFormat.format(new Date(item.createdAt))}</small>
-                            <span className="request-meta"><Badge status={item.status}
-                              label={item.status === "declined" ? "Awaiting admin review" : undefined} /></span>
-                          </span>
-                          <Icon name="chevron" size={16} />
-                        </button>
-                      )) : <p className="empty">You haven’t submitted a request yet.</p>}
-                    </section>
-                    {(leads.length > 0 || selectedId) && <section className={`bookshelf-reading${selectedId ? " is-opening" : ""}`}
-                      aria-label="Request details" key={selectedId}>{record}</section>}
-                  </div>
-                ) : (
-                  <StaffList leads={leads} selectedId={selectedId} select={select} admin={isAdmin} filter={filter}
-                    changeFilter={(value) => { setFilter(value); select(); }} record={record} locked={acting} />
-                )}
-            </div>
-          )}
+          <div className="portal-page" key={composing ? "intake" : "list"}>
+            {composing ? (
+              <Intake name={user.name} email={email} submit={submitLead} cancel={() => showIntake(false)}
+                submitting={acting} error={actionError} />
+            ) : (
+              <div className={isPlaintiff ? "plaintiff-home" : undefined}>
+                <header className="page-heading split-heading">
+                  <div><h1 tabIndex={-1} ref={focusHeading}>{home}</h1><p>{isPlaintiff ? "Track your requests and open your cases." :
+                    isAdmin ? "View leads and their current assignments across firms." : "Review new leads assigned to your firm."}</p></div>
+                  {isPlaintiff && <button className="button primary" onClick={() => showIntake(true)} disabled={!leads || acting}>
+                    <Icon name="plus" size={16} />Submit a request
+                  </button>}
+                </header>
+                {listError ? <Message error>{listError}{" "}
+                  <button className="subtle-link" onClick={() => { setListError(""); setListAttempt((attempt) => attempt + 1); }}>Try again</button>
+                </Message> : !leads ? <Message>Loading {isPlaintiff ? "requests" : "leads"}…</Message> :
+                  isPlaintiff ? (
+                    <div className={`bookshelf${selectedId ? " has-selection" : ""}`}>
+                      <section className="bookshelf-index request-list" aria-labelledby="requests-heading">
+                        <div className="card-heading"><h2 id="requests-heading">All requests</h2></div>
+                        {leads.length ? leads.map((item) => (
+                          <button key={item.id} className="request-card" data-reveal="" aria-pressed={selectedId === item.id} onClick={() => select(item.id)}>
+                            <span className="request-icon"><Icon name="file" /></span>
+                            <span className="request-copy">
+                              <strong className="request-title">{requestTitle(item)}</strong>
+                              <small>{item.category} · {dateFormat.format(new Date(item.createdAt))}</small>
+                              <span className="request-meta"><Badge status={item.status}
+                                label={item.status === "declined" ? "Awaiting admin review" : undefined} /></span>
+                            </span>
+                            <Icon name="chevron" size={16} />
+                          </button>
+                        )) : <p className="empty">You haven’t submitted a request yet.</p>}
+                      </section>
+                      {(leads.length > 0 || selectedId) && <section className="bookshelf-reading workspace-record"
+                        aria-label="Request details" key={selectedId}>{record}</section>}
+                    </div>
+                  ) : (
+                    <StaffList leads={leads} selectedId={selectedId} select={select} admin={isAdmin} filter={filter}
+                      changeFilter={(value) => {
+                        if (filter === value) return;
+                        setFilter(value);
+                        select();
+                      }} record={record} locked={acting} />
+                  )}
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>
@@ -529,7 +567,7 @@ function Intake({ name, email, submit, cancel, submitting, error }: {
   return (
     <>
       <button className="subtle-link" onClick={cancel} disabled={submitting}><Icon name="back" size={16} />My requests</button>
-      <header className="page-heading"><h1>Submit a request</h1><p>Tell us about your situation so we can match you with a firm.</p></header>
+      <header className="page-heading"><h1 tabIndex={-1} ref={focusHeading}>Submit a request</h1><p>Tell us about your situation so we can match you with a firm.</p></header>
       <div className="plaintiff-grid">
         <form className="panel detail-card form-stack" onSubmit={submit}>
           <div className="card-heading"><h2>Request details</h2></div>
@@ -585,9 +623,9 @@ function StaffList({ leads, selectedId, select, admin, filter, changeFilter, rec
       <div className="staff-workspace">
         <section className="staff-list" aria-label="Leads">
           <div className="staff-list-label">{filtered.length} {filtered.length === 1 ? "lead" : "leads"}</div>
-          {filtered.length ? <div className="staff-rows">
+          {filtered.length ? <div className="staff-rows motion-enter motion-detail" key={filter}>
             {filtered.map((item) => (
-              <button key={item.id} className={`staff-row${selectedId === item.id ? " is-selected" : ""}`}
+              <button key={item.id} data-reveal="" className={`staff-row${selectedId === item.id ? " is-selected" : ""}`}
                 aria-pressed={selectedId === item.id} disabled={locked} onClick={() => select(item.id)}>
                 <span className="staff-row-avatar" aria-hidden="true">{initials(item.name)}</span>
                 <span className="staff-row-body">
@@ -601,7 +639,7 @@ function StaffList({ leads, selectedId, select, admin, filter, changeFilter, rec
             ))}
           </div> : <div className="empty-state staff-empty"><Icon name="inbox" size={23} /><h3>No leads here yet</h3></div>}
         </section>
-        <section className="staff-detail" aria-label="Lead details" key={selectedId}>{record}</section>
+        <section className="staff-detail workspace-record" aria-label="Lead details" key={selectedId}>{record}</section>
       </div>
     </>
   );
@@ -617,7 +655,7 @@ function LeadDetail({ lead, plaintiff, admin, accepting, acceptLead, actionError
     lead.status === "pending_assignment" ? "Your request is waiting to be assigned to a firm." :
     lead.status === "declined" ? "Your request is awaiting admin review." : "Your request was closed.";
   return (
-    <article className={plaintiff ? undefined : "staff-record"}>
+    <article className={`motion-enter motion-detail${plaintiff ? "" : " staff-record"}`}>
       <header className={plaintiff ? "bookshelf-detail-header" : "detail-header"}>
         {plaintiff && <button className="subtle-link bookshelf-close" onClick={close}><Icon name="back" size={16} />All requests</button>}
         <div className={plaintiff ? undefined : "detail-title"}>
@@ -644,12 +682,12 @@ function LeadDetail({ lead, plaintiff, admin, accepting, acceptLead, actionError
         {actionError && <div className="detail-section"><Message error>{actionError}</Message></div>}
       </div>
       {lead.caseId ? (
-        <footer className="review-footer" data-review-state="accepted">
+        <footer className="review-footer motion-enter motion-feedback" data-review-state="accepted" key="accepted">
           <div className="review-footer-copy"><strong>Linked case</strong><small>Lead accepted</small></div>
           <button className="button primary" onClick={() => lead.caseId && openCase(lead.caseId)}>Open case <Icon name="arrow" size={16} /></button>
         </footer>
       ) : !plaintiff && !admin && lead.status === "awaiting_firm_review" ? (
-        <footer className="review-footer" data-review-state="review">
+        <footer className="review-footer" data-review-state="review" key="review">
           <div className="review-footer-copy"><strong>Lead decision</strong><small>Accept to open a case.</small></div>
           <button className="button primary" onClick={acceptLead} disabled={accepting}>
             <Icon name="check" size={16} />{accepting ? "Accepting…" : "Accept lead"}
@@ -675,7 +713,7 @@ function CaseDetail({ id, back, plaintiff }: { id: string; back: () => void; pla
   }, [id]);
 
   return (
-    <article>
+    <article className="motion-enter motion-detail">
       <header className={plaintiff ? "bookshelf-detail-header" : "detail-header"}>
         <button className="subtle-link" onClick={back}><Icon name="back" size={16} />{plaintiff ? "Back to request" : "Back to lead"}</button>
         <div className={plaintiff ? undefined : "detail-title"}>
@@ -685,7 +723,7 @@ function CaseDetail({ id, back, plaintiff }: { id: string; back: () => void; pla
       </header>
       <div className={plaintiff ? "bookshelf-detail-content" : "detail-body"}>
         {error ? <Message error>{error}</Message> : item ? (
-          <section className="detail-section">
+          <section className="detail-section motion-enter motion-detail">
             <h3>Case progress</h3>
             <p className="detail-copy">{item.status === "open" ? "The firm has opened the case." : statuses[item.status][0]}</p>
             <dl className="detail-meta">
