@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, open, readFile, unlink } from "node:fs/promises";
 import { resolve } from "node:path";
 import { isFirmStaff } from "./case-work";
+import { transferReviewScope } from "./leads";
 import { db, transaction } from "./db";
 import { isUuid, RequestError } from "./http";
 import { idempotent, requestHash } from "./idempotency";
@@ -14,7 +15,8 @@ const directory = resolve(process.cwd(), ".data", "documents");
 // A null firm denotes the plaintiff. Staff must match both the current
 // assignment and the sharing firm, unless the plaintiff uploaded the PDF.
 const visibleLead = "(($2::uuid IS NULL AND l.plaintiff_id = $3) OR l.firm_id = $2)";
-const visibleDocument = "($2::uuid IS NULL OR d.sharing_firm_id IS NULL OR d.sharing_firm_id = $2)";
+const reviewableLead = `(${visibleLead} OR ${transferReviewScope("l", "$2")})`;
+const visibleDocument = "($2::uuid IS NULL OR d.sharing_firm_id IS NULL OR (l.firm_id = $2 AND d.sharing_firm_id = $2))";
 
 function documentViewer(user: User) {
   if (user.role !== "plaintiff" && !isFirmStaff(user)) {
@@ -36,11 +38,11 @@ export async function listDocuments(user: User, leadId: string, before?: string)
        AND ($4::uuid IS NULL OR (d.created_at, d.id) < (
          SELECT p.created_at, p.id FROM documents p
          WHERE p.id = $4 AND p.lead_id = l.id
-           AND ($2::uuid IS NULL OR p.sharing_firm_id IS NULL OR p.sharing_firm_id = $2)
+           AND ($2::uuid IS NULL OR p.sharing_firm_id IS NULL OR (l.firm_id = $2 AND p.sharing_firm_id = $2))
        ))
      LEFT JOIN users u ON u.id = d.uploader_user_id
      LEFT JOIN firms f ON f.id = d.sharing_firm_id
-     WHERE l.id = $1 AND ${visibleLead}
+     WHERE l.id = $1 AND ${reviewableLead}
      ORDER BY d.created_at DESC, d.id DESC LIMIT 26`,
     [leadId, user.firmId, user.id, before ?? null],
   );
@@ -166,7 +168,7 @@ export async function openDocument(user: User, id: string) {
     const { rows } = await client.query<{ file_name: string; storage_key: string }>(
       `SELECT d.file_name, d.storage_key
        FROM documents d JOIN leads l ON l.id = d.lead_id
-       WHERE d.id = $1 AND ${visibleLead} AND ${visibleDocument}
+       WHERE d.id = $1 AND ${reviewableLead} AND ${visibleDocument}
        FOR SHARE OF l`,
       [id, user.firmId, user.id],
     );

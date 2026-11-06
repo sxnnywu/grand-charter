@@ -23,7 +23,13 @@ type LeadStatus = "pending_assignment" | "awaiting_firm_review" | "accepted" | "
 type CaseStatus = "open" | "in_progress" | "closed";
 type StaffFilter = LeadStatus | "all" | "cases";
 type PlaintiffNotice = { id: string; message: string; createdAt: string };
+export type CaseTransfer = {
+  id: string; caseId: string; status: "pending" | "accepted" | "declined" | "cancelled";
+  fromFirmId: string; fromFirmName: string; toFirmId: string; toFirmName: string; createdAt: string;
+};
 export type Lead = {
+  transfer?: CaseTransfer | null;
+  reviewTransfer?: boolean;
   id: string;
   title?: string | null;
   name: string;
@@ -1022,7 +1028,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
                   isPlaintiff ? (
                     <PlaintiffHome leads={leads} loading={listLoading} selectedId={selectedId} record={record}
                       onSelect={select} onStart={() => showIntake(true)} locked={acting} pagination={pagination}
-                      firstName={user.name.trim().split(/\s+/)[0]} hasDraft={hasIntakeDraft}
+                      userId={user.id} firstName={user.name.trim().split(/\s+/)[0]} hasDraft={hasIntakeDraft}
                       pendingRequest={pendingRequest} pendingRequestState={pendingRequestState} pendingRequestKind={pendingRequestKind}
                       requestKind={requestKind} onRequestKindChange={changeRequestKind}
                       onResetFilters={() => navigatePlaintiff(undefined, undefined, "all", false, "all")}

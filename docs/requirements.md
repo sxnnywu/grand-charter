@@ -108,7 +108,7 @@ The app connects people seeking legal help with law firms. A plaintiff submits a
 - A lead reassigned for review appears in the receiving firm's active inbox. Closing a declined lead ends its assignment and leaves it visible to the plaintiff and admins.
 - The plaintiff sees an in-app notice when an admin reassigns or closes their lead.
 - After reassignment, the record is available to the new firm and the previous firm loses access, including through links it already has.
-- A reassigned case keeps its progress and moves with its linked lead. The new firm can see the case details and PDFs uploaded by the plaintiff. The plaintiff keeps access to the case and PDFs already shared with them. The [private note rules](#firm-private-notes) still apply.
+- A case transfer requires the receiving firm to accept or decline an offer in its lead inbox. The current firm retains ownership until acceptance. An accepted transfer preserves the case and moves its linked lead; a declined offer returns to admin. The new firm can see the case details and PDFs uploaded by the plaintiff. The plaintiff keeps access to the case and PDFs already shared with them. The [private note rules](#firm-private-notes) still apply.
 
 ### Audit history
 
@@ -124,7 +124,7 @@ The app connects people seeking legal help with law firms. A plaintiff submits a
 
 ### Access and persistence
 
-- A plaintiff can access only their own leads and cases. Firm staff can access only leads and cases assigned to their firm. The backend enforces these rules, including when someone opens a record or PDF link directly.
+- A plaintiff can access only their own leads and cases. Firm staff can access their assigned cases and leads, plus intake details and plaintiff PDFs for their latest incoming transfer offers until resolved. The backend enforces these rules, including when someone opens a record or PDF link directly.
 - Leads, cases, PDFs, private notes, and audit history persist between sessions and remain available to users who have access.
 
 See the [original assignment](assignment.md), [user personas](user-personas.md), [journeys](user-journeys-and-flows.md), [workflow rules](workflow-rules.md), and [decision log](decisions.md).

@@ -8,7 +8,13 @@ import type { User } from "./session";
 const leadColumns = `
   l.id, l.name, l.email, l.title, l.category, l.region, l.description, l.status,
   l.created_at AS "createdAt", c.id AS "caseId", c.status AS "caseStatus",
-  l.firm_id AS "firmId", f.name AS "firmName"
+  l.firm_id AS "firmId", f.name AS "firmName",
+  (SELECT json_build_object('id', t.id, 'caseId', t.case_id, 'status', t.status,
+      'fromFirmId', t.from_firm_id, 'fromFirmName', old_firm.name,
+      'toFirmId', t.to_firm_id, 'toFirmName', new_firm.name, 'createdAt', t.created_at)
+   FROM case_transfers t JOIN firms old_firm ON old_firm.id = t.from_firm_id
+   JOIN firms new_firm ON new_firm.id = t.to_firm_id
+   WHERE t.case_id = c.id ORDER BY t.created_at DESC, t.id DESC LIMIT 1) AS transfer
 `;
 
 const leadRelations = `
@@ -16,21 +22,40 @@ const leadRelations = `
 `;
 export const leadDetails = `SELECT ${leadColumns} ${leadRelations}`;
 
-function visibleLeads(user: User, alias: "l" | "p" = "l") {
+export function transferReviewScope(alias: string, firmParameter: string) {
+  return `${alias}.id IN (SELECT tc.lead_id FROM case_transfers t JOIN cases tc ON tc.id = t.case_id
+    WHERE t.to_firm_id = ${firmParameter}
+      AND t.status IN ('pending', 'declined') AND t.id = (
+        SELECT recent.id FROM case_transfers recent WHERE recent.case_id = t.case_id
+        ORDER BY recent.created_at DESC, recent.id DESC LIMIT 1))`;
+}
+const declinedTransfer = `c.id IN (SELECT t.case_id FROM case_transfers t WHERE t.status = 'declined'
+  AND t.id = (SELECT recent.id FROM case_transfers recent WHERE recent.case_id = t.case_id
+    ORDER BY recent.created_at DESC, recent.id DESC LIMIT 1))`;
+
+function presentLead(user: User, row: QueryResultRow) {
+  if (user.role !== "admin" && user.role !== "plaintiff" && row.firmId !== user.firmId
+    && row.transfer?.toFirmId === user.firmId && ["pending", "declined"].includes(row.transfer.status)) {
+    return { ...row, reviewTransfer: true, status: row.transfer.status === "pending" ? "awaiting_firm_review" : "declined", caseId: null, caseStatus: null };
+  }
+  return row;
+}
+
+function visibleLeads(user: User, alias: "l" | "p" = "l", includeOffers = true) {
   switch (user.role) {
     case "admin":
       return { clause: "TRUE", values: [] };
     case "plaintiff":
       return { clause: `${alias}.plaintiff_id = $1`, values: [user.id] };
     default:
-      return { clause: `${alias}.firm_id = $1`, values: [user.firmId] };
+      return { clause: includeOffers ? `(${alias}.firm_id = $1 OR ${transferReviewScope(alias, "$1")})` : `${alias}.firm_id = $1`, values: [user.firmId] };
   }
 }
 
 const pageSize = 50;
 
 async function listRecords(user: User, params: URLSearchParams, casesOnly: boolean) {
-  const scope = visibleLeads(user);
+  const scope = visibleLeads(user, "l", !casesOnly);
   const clauses = [scope.clause];
   const values: (string | null)[] = [...scope.values];
   const parameter = (value: string) => `$${values.push(value)}`;
@@ -41,13 +66,20 @@ async function listRecords(user: User, params: URLSearchParams, casesOnly: boole
   if (params.get("attention") === "true") {
     if (user.role !== "admin") throw new RequestError(403, "Only admins can open the attention queue.");
     if (casesOnly) throw new RequestError(400, "The attention filter is only available for leads.");
-    clauses.push("l.status IN ('pending_assignment', 'declined')");
+    clauses.push(`(l.status IN ('pending_assignment', 'declined') OR ${declinedTransfer})`);
   }
   const status = params.get("status");
   const region = params.get("region");
   const category = params.get("category");
   const before = params.get("before") ?? undefined;
-  if (status) clauses.push(`${casesOnly ? "c" : "l"}.status = ${parameter(status)}`);
+  if (status) {
+    const value = parameter(status);
+    if (user.role === "admin" && params.get("attention") === "true" && status === "declined") clauses.push(`(l.status = ${value} OR ${declinedTransfer})`);
+    else if (!casesOnly && user.firmId) clauses.push(`(CASE WHEN l.firm_id = $1 THEN l.status
+      WHEN EXISTS (SELECT 1 FROM case_transfers t JOIN cases tc ON tc.id = t.case_id
+        WHERE tc.lead_id = l.id AND t.to_firm_id = $1 AND t.status = 'pending') THEN 'awaiting_firm_review' ELSE 'declined' END) = ${value}`);
+    else clauses.push(`${casesOnly ? "c" : "l"}.status = ${value}`);
+  }
   if (region) clauses.push(`l.region = ${parameter(region)}`);
   if (category) clauses.push(`l.category = ${parameter(category)}`);
   if (user.role === "plaintiff") {
@@ -89,7 +121,7 @@ async function listRecords(user: User, params: URLSearchParams, casesOnly: boole
 
   const matchingWhere = clauses.join(" AND ");
   if (before) clauses.push(`(l.created_at, l.id) ${oldest ? ">" : "<"} (
-    SELECT p.created_at, p.id FROM leads p WHERE ${visibleLeads(user, "p").clause} AND p.id = ${parameter(before)}
+    SELECT p.created_at, p.id FROM leads p WHERE ${visibleLeads(user, "p", !casesOnly).clause} AND p.id = ${parameter(before)}
   )`);
 
   const details = user.role === "plaintiff" ? `
@@ -117,7 +149,7 @@ async function listRecords(user: User, params: URLSearchParams, casesOnly: boole
   } else {
     ({ rows } = await db().query(pageQuery, values));
   }
-  const leads = rows.slice(0, pageSize);
+  const leads = rows.slice(0, pageSize).map(row => presentLead(user, row));
   return {
     leads,
     nextCursor: rows.length > pageSize ? leads.at(-1)!.id as string : null,
@@ -148,7 +180,7 @@ export async function getLead(user: User, id: string) {
     [...scope.values, id],
   );
   if (!rows[0]) throw new RequestError(404, "Lead not found.");
-  if (user.role !== "plaintiff") return rows[0];
+  if (user.role !== "plaintiff") return presentLead(user, rows[0]);
   const notices = await db().query(
     `SELECT id, message, created_at AS "createdAt" FROM plaintiff_notices
      WHERE lead_id = $1 ORDER BY created_at DESC, id DESC`,
@@ -214,6 +246,8 @@ function reviewLead<T>(
   id: string,
   decision: "accept" | "decline",
   apply: (client: PoolClient) => Promise<T>,
+  transferred: (client: PoolClient, caseId: string) => Promise<T>,
+  expectedTransfer?: string,
 ) {
   if (!user.firmId || (user.role !== "attorney" && user.role !== "paralegal")) {
     throw new RequestError(403, `Only assigned firm staff can ${decision} a lead.`);
@@ -221,11 +255,30 @@ function reviewLead<T>(
   if (!isUuid(id)) throw new RequestError(404, "Lead not found.");
 
   return transaction(async (client) => {
-    const { rows } = await client.query<{ status: string }>(
-      "SELECT status FROM leads WHERE id = $1 AND firm_id = $2 FOR UPDATE",
+    const { rows } = await client.query<{ status: string; firm_id: string }>(
+      `SELECT l.status, l.firm_id FROM leads l WHERE l.id = $1 AND (l.firm_id = $2 OR ${transferReviewScope("l", "$2")}) FOR UPDATE`,
       [id, user.firmId],
     );
     if (!rows[0]) throw new RequestError(404, "Lead not found.");
+    if (rows[0].firm_id !== user.firmId) {
+      const { rows: [offer] } = await client.query(`SELECT t.*, f.name AS "fromName", target.name AS "toName"
+        FROM case_transfers t JOIN cases c ON c.id = t.case_id
+        JOIN firms f ON f.id = t.from_firm_id JOIN firms target ON target.id = t.to_firm_id
+        WHERE c.lead_id = $1 ORDER BY t.created_at DESC, t.id DESC LIMIT 1 FOR UPDATE OF t`, [id]);
+      if (!offer || offer.id !== expectedTransfer || offer.to_firm_id !== user.firmId || offer.status !== "pending") throw new RequestError(409, "This transfer offer is no longer awaiting your firm’s review.");
+      if (rows[0].firm_id !== offer.from_firm_id) throw new RequestError(409, "The current assignment has changed. Ask an admin to review the transfer.");
+      const status = decision === "accept" ? "accepted" : "declined";
+      await client.query("UPDATE case_transfers SET status = $2, decided_by = $3, decided_at = clock_timestamp() WHERE id = $1", [offer.id, status, user.id]);
+      if (decision === "accept") await client.query("UPDATE leads SET firm_id = $2 WHERE id = $1", [id, user.firmId]);
+      await client.query(`INSERT INTO audit_events (lead_id, event_type, actor_user_id, before_values, after_values) VALUES ($1, $2, $3, $4, $5)`,
+        [id, `case_transfer_${status}`, user.id, { firmName: offer.fromName, transferStatus: "pending" },
+          { firmName: decision === "accept" ? offer.toName : offer.fromName, proposedFirmName: offer.toName, transferStatus: status }]);
+      await client.query("INSERT INTO plaintiff_notices (lead_id, message) VALUES ($1, $2)", [id, decision === "accept"
+        ? `${offer.toName} accepted the transfer and is now handling your case. Its progress is unchanged.`
+        : `${offer.toName} declined the transfer. ${offer.fromName} continues handling your case while an administrator reviews the next step.`]);
+      return transferred(client, offer.case_id);
+    }
+    if (expectedTransfer) throw new RequestError(409, "This transfer has already been decided.");
     if (rows[0].status !== "awaiting_firm_review") {
       throw new RequestError(409, "This lead is no longer awaiting review.");
     }
@@ -233,7 +286,7 @@ function reviewLead<T>(
   });
 }
 
-export function acceptLead(user: User, id: string) {
+export function acceptLead(user: User, id: string, expectedTransfer?: string) {
   return reviewLead(user, id, "accept", async (client) => {
     await client.query("UPDATE leads SET status = 'accepted' WHERE id = $1", [id]);
     const opened = await client.query<{ id: string }>(
@@ -247,10 +300,10 @@ export function acceptLead(user: User, id: string) {
       [id, user.id, { status: "awaiting_firm_review" }, { status: "accepted", caseId, caseStatus: "open" }],
     );
     return caseId;
-  });
+  }, async (_client, caseId) => caseId, expectedTransfer);
 }
 
-export function declineLead(user: User, id: string) {
+export function declineLead(user: User, id: string, expectedTransfer?: string) {
   return reviewLead(user, id, "decline", async (client) => {
     await client.query("UPDATE leads SET status = 'declined' WHERE id = $1", [id]);
     await client.query(
@@ -260,12 +313,24 @@ export function declineLead(user: User, id: string) {
     );
     const { rows } = await client.query(`${leadDetails} WHERE l.id = $1`, [id]);
     return rows[0];
-  });
+  }, async (client) => {
+    const { rows: [lead] } = await client.query(`${leadDetails} WHERE l.id = $1`, [id]);
+    return presentLead(user, lead);
+  }, expectedTransfer);
+}
+
+export async function decideCaseTransfer(user: User, id: string, decision: "accept" | "decline") {
+  if (!isUuid(id)) throw new RequestError(404, "Transfer offer not found.");
+  const { rows: [offer] } = await db().query(`SELECT c.lead_id FROM case_transfers t JOIN cases c ON c.id = t.case_id WHERE t.id = $1 AND t.to_firm_id = $2`, [id, user.firmId]);
+  if (!offer) throw new RequestError(404, "Transfer offer not found.");
+  if (decision === "decline") return { lead: await declineLead(user, offer.lead_id, id) };
+  const caseId = await acceptLead(user, offer.lead_id, id);
+  return { caseId, lead: await getLead(user, offer.lead_id) };
 }
 
 export async function getCase(user: User, id: string) {
   if (!isUuid(id)) throw new RequestError(404, "Case not found.");
-  const scope = visibleLeads(user);
+  const scope = visibleLeads(user, "l", false);
   const { rows } = await db().query(
     `SELECT c.id, c.lead_id AS "leadId", l.name, l.category, l.region, c.status,
             f.name AS "firmName", c.created_at AS "createdAt"

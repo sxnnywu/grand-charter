@@ -92,6 +92,7 @@ export function FirmLeadDetail({ lead, role = "attorney", onBack, onOpenCase, on
 }) {
   const declineDialog = useRef<HTMLDialogElement>(null);
   const outcome = useRef<HTMLHeadingElement>(null);
+  const transferReview = lead.reviewTransfer || !!lead.transfer && lead.transfer.toFirmId === lead.firmId && lead.transfer.status === "accepted";
   const accepted = lead.status === "accepted" && !!lead.caseId;
 
   useEffect(() => {
@@ -112,14 +113,15 @@ export function FirmLeadDetail({ lead, role = "attorney", onBack, onOpenCase, on
     </header>
     <div className="firm-record-body">
       {decisionNotice && <section className={`firm-record-outcome${decisionNotice === "declined" ? " firm-record-outcome-neutral" : ""}`} role="status">
-        <h3 tabIndex={-1} ref={outcome}>{decisionNotice === "accepted" ? "Lead accepted. Case created." : "Lead declined."}</h3>
-        {decisionNotice === "declined" && <p>An admin will decide whether to assign another firm or close the lead.</p>}
+        <h3 tabIndex={-1} ref={outcome}>{decisionNotice === "accepted" ? transferReview ? "Transfer accepted. Case added." : "Lead accepted. Case created." : transferReview ? "Transfer declined." : "Lead declined."}</h3>
+        {decisionNotice === "declined" && <p>{transferReview ? `${lead.transfer?.fromFirmName} continues handling this case. An admin will review the declined transfer.` : "An admin will decide whether to assign another firm or close the lead."}</p>}
         <div className="firm-record-outcome-actions">
           {accepted && <button className="button primary" type="button" disabled={locked} onClick={onOpenCase}>Open case <Arrow /></button>}
           {hasNextReview && <button className="button" type="button" disabled={locked} onClick={onReviewNext}>Review next lead <Arrow /></button>}
           {!hasNextReview && <span>No more leads in the current review list.</span>}
         </div>
       </section>}
+      {lead.reviewTransfer && <section className="firm-transfer-context"><h3>Case transfer for review</h3><p>{lead.transfer?.fromFirmName} is the current firm. Accepting transfers this existing case to your firm and keeps its progress. Until then, you can review the intake and plaintiff-uploaded PDFs.</p></section>}
       <section className="firm-record-inquiry" aria-label="Original inquiry">
         <h3>What they need help with</h3>
         <p className="firm-record-narrative">{lead.description}</p>
@@ -132,13 +134,13 @@ export function FirmLeadDetail({ lead, role = "attorney", onBack, onOpenCase, on
       {decisionError && <p className="workspace-message workspace-error" role="alert">{decisionError}</p>}
     </div>
     {lead.status === "awaiting_firm_review" ? <footer className="firm-review-footer">
-      <p>Accepting creates a case for your firm.</p>
+      <p>{lead.reviewTransfer ? "Accepting transfers the existing case to your firm." : "Accepting creates a case for your firm."}</p>
       <div className="firm-review-actions">
         <button className="button danger" type="button" disabled={locked} onClick={() => declineDialog.current?.showModal()}>
-          {decision === "decline" ? "Declining…" : "Decline lead"}
+          {decision === "decline" ? "Declining…" : lead.reviewTransfer ? "Decline transfer" : "Decline lead"}
         </button>
         <button className="button primary" type="button" disabled={locked} onClick={() => onDecide("accept")}>
-          {decision === "accept" ? "Accepting…" : "Accept lead"}
+          {decision === "accept" ? "Accepting…" : lead.reviewTransfer ? "Accept transfer" : "Accept lead"}
         </button>
       </div>
     </footer> : !decisionNotice && accepted ? <footer className="firm-review-footer firm-review-accepted">
@@ -149,7 +151,7 @@ export function FirmLeadDetail({ lead, role = "attorney", onBack, onOpenCase, on
     </footer> : null}
     <dialog ref={declineDialog} aria-labelledby="firm-decline-title" aria-describedby="firm-decline-description">
       <div className="dialog-head"><h2 id="firm-decline-title">Decline this lead?</h2></div>
-      <div className="dialog-body"><p id="firm-decline-description">The lead will go to admin review. An admin can assign it again or close it. Your firm can still view it while assigned.</p></div>
+      <div className="dialog-body"><p id="firm-decline-description">{lead.reviewTransfer ? `${lead.transfer?.fromFirmName} keeps the case. The transfer returns to admin for review.` : "The lead will go to admin review. An admin can assign it again or close it. Your firm can still view it while assigned."}</p></div>
       <form method="dialog" className="dialog-footer">
         <button className="button" type="submit">Cancel</button>
         <button className="button primary danger" type="button" disabled={locked} onClick={() => {

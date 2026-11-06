@@ -11,6 +11,11 @@ erDiagram
     LEADS ||--o{ DOCUMENTS : has
     USERS ||--o{ DOCUMENTS : uploads
     FIRMS o|--o{ DOCUMENTS : shared
+    CASES ||--o{ CASE_TRANSFERS : receives
+    FIRMS ||--o{ CASE_TRANSFERS : current_firm
+    FIRMS ||--o{ CASE_TRANSFERS : proposed_firm
+    USERS ||--o{ CASE_TRANSFERS : offers
+    USERS o|--o{ CASE_TRANSFERS : decides
     CASES ||--o{ FIRM_NOTES : has
     USERS ||--o{ FIRM_NOTES : writes
     FIRMS ||--o{ FIRM_NOTES : owns
@@ -31,6 +36,7 @@ These are the logical fields we need for the workflows.
 | `firms` | <ul><li>ID</li><li>Name</li></ul> |
 | `leads` | <ul><li>ID</li><li>Plaintiff user ID</li><li>Name and email as submitted</li><li>Optional request title, up to 80 characters</li><li>Category</li><li>Region</li><li>Description</li><li>Lead status</li><li>Current firm ID. Pending and closed leads have no current firm.</li><li>Submission time</li></ul> |
 | `cases` | <ul><li>ID</li><li>Unique lead ID. The linked lead provides the plaintiff and current firm.</li><li>Progress status</li><li>Creation time</li></ul> |
+| `case_transfers` | <ul><li>ID and case ID</li><li>Current and proposed firm IDs</li><li>Pending, accepted, declined, or cancelled status</li><li>Offering admin, deciding user, and timestamps</li><li>At most one pending offer per case</li></ul> |
 | `documents` | <ul><li>ID</li><li>Lead ID. The case reads documents through the lead, including plaintiff PDFs uploaded before acceptance.</li><li>Filename</li><li>Private storage key</li><li>Uploader user ID</li><li>Sharing firm ID for firm uploads</li><li>Upload time</li></ul> |
 | `firm_notes` | <ul><li>ID</li><li>Case ID</li><li>Author user ID</li><li>Owning firm ID. Ownership stays with the firm that wrote the note.</li><li>Note text</li><li>Creation time</li></ul> |
 | `routing_rules` | <ul><li>Category</li><li>Region</li><li>Destination firm ID. The proposed seed data has one destination per category and region pair.</li></ul> |

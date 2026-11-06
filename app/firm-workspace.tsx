@@ -11,6 +11,7 @@ import { caseViews, emptyFirmLocation, firmListUrl, firmUrl, leadViews, readFirm
 import { animateWorkspace, stopWorkspaceTransition } from "./workspace-motion";
 import type { Account, Lead, User } from "./workspace";
 import "./firm-workspace.css";
+import { WorkdeskTitle } from "./workdesk-title";
 import "./workdesk.css";
 
 type Decision = "accept" | "decline";
@@ -82,6 +83,8 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
   const [location, setLocation] = useState(() => initialLocation(user.id));
   const preferredLayout = useRef(location.layout);
   const listFilter = useRef<FirmFilter>(location.view === "cases" ? location.filter : "all");
+  const focusMemory = useRef<Partial<Record<FirmView, Lead | undefined>>>({});
+  const [collectionFloor, setCollectionFloor] = useState(360);
   const [openingWorkspace, setOpeningWorkspace] = useState(true);
   const locationRef = useRef(location);
   locationRef.current = location;
@@ -158,7 +161,7 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
     && !boardSummary.summary.error && boardSummary.summary.empty;
   const emptyList = !!currentPage && items.length === 0;
   const priorFilterVisibility = useRef(false);
-  const showFilters = board || filtered || (currentPage ? !emptyList || drawer : priorFilterVisibility.current);
+  const showFilters = board || filtered || !!currentPage || priorFilterVisibility.current;
   useLayoutEffect(() => { priorFilterVisibility.current = showFilters; }, [showFilters]);
   const searchScope = location.view === "leads"
     ? location.filter === "awaiting_firm_review" ? "leads needing review" : `${location.filter} leads`
@@ -341,6 +344,8 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
 
   function changeFilter(filter: FirmFilter) {
     if (filter !== location.filter) {
+      const collection = document.querySelector(".firm-workspace-grid");
+      if (collection) setCollectionFloor(Math.max(360, innerHeight - collection.getBoundingClientRect().top));
       navigate({ ...location, filter, leadId: undefined, caseId: undefined });
     }
   }
@@ -589,9 +594,9 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
     try {
       let updated: Lead;
       if (decision === "accept") {
-        const { caseId } = await request<{ caseId: string }>(`/api/leads/${lead.id}/accept`, { method: "POST" });
-        updated = { ...lead, status: "accepted", caseId, caseStatus: "open" };
-      } else updated = (await request<{ lead: Lead }>(`/api/leads/${lead.id}/decline`, { method: "POST" })).lead;
+        const result = await request<{ caseId: string; lead?: Lead }>(lead.reviewTransfer ? `/api/case-transfers/${lead.transfer!.id}/accept` : `/api/leads/${lead.id}/accept`, { method: "POST" });
+        updated = result.lead ?? { ...lead, status: "accepted", caseId: result.caseId, caseStatus: "open" };
+      } else updated = (await request<{ lead: Lead }>(lead.reviewTransfer ? `/api/case-transfers/${lead.transfer!.id}/decline` : `/api/leads/${lead.id}/decline`, { method: "POST" })).lead;
       listRevision.current += 1;
       setPage((current) => current && { ...current, items: current.items.map((item) => item.id === updated.id ? updated : item) });
       setListAttempt((attempt) => attempt + 1);
@@ -656,10 +661,14 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
     </button>
   </div>;
   const deskItems = board ? boardRecords?.path === path ? boardRecords.groups.flatMap(group => group.items) : [] : items;
-  const focusItem = location.view === "leads"
+  const candidateFocus = location.view === "leads"
     ? deskItems.find(item => item.status === "awaiting_firm_review") ?? deskItems[0]
     : deskItems.find(item => item.caseStatus !== "closed") ?? deskItems[0];
   const focusReady = !loading && !pendingCollection && !listError && (board ? boardSummary?.path === path && !boardSummary.summary.loading && !boardSummary.summary.error : !!currentPage);
+  if (focusReady && (!Object.hasOwn(focusMemory.current, location.view) || !filtered && (board || location.filter === (location.view === "cases" ? "all" : "awaiting_firm_review")))) {
+    focusMemory.current[location.view] = candidateFocus;
+  }
+  const focusItem = focusMemory.current[location.view] ?? candidateFocus;
   const role = user.role === "paralegal" ? "paralegal" : "attorney";
   const record = lead ? location.caseId && lead.caseId === location.caseId ? <FirmCaseDetail key={location.caseId}
     id={location.caseId} initialRecord={preparedCases.current.get(location.caseId)} lead={lead} role={role} drawer onBack={() => select()} locked={locked} onBusyChange={setChildBusy}
@@ -705,12 +714,12 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
             <div className="firm-heading-copy">
             <p className="workdesk-eyebrow">{user.firmName} · {location.view === "leads" ? "Incoming requests" : "Accepted work"}</p>
             <h1 tabIndex={-1} ref={heading} aria-label={location.view === "leads" ? "Leads" : "Cases"}>
-              <span key={location.view} className="workdesk-heading-word" aria-hidden="true"><span>{location.view === "leads" ? "Leads" : "Cases"}</span></span>
+              <WorkdeskTitle key={location.view} text={location.view === "leads" ? "Leads" : "Cases"} />
             </h1>
             <p key={location.view} className="workdesk-description">{location.view === "leads" ? "Meet the people asking for your help. Review a request to decide whether your firm can take it on." : "The work your firm has taken on. Keep each case moving and its documents together."}</p>
             </div>
             <aside key={location.view} className="workdesk-focus" aria-label="Next action">
-              <span className="workdesk-focus-label">{location.view === "leads" ? location.filter === "awaiting_firm_review" ? "Next to review" : "From this view" : "Continue a case"}</span>
+              <span className="workdesk-focus-label">{location.view === "leads" ? "Next to review" : "Continue a case"}</span>
               <p className="workdesk-focus-title">{focusItem?.name ?? (!focusReady ? "Getting your workspace ready" : (location.view === "leads" ? "No leads in this view" : "No cases in this view"))}</p>
               <p className="workdesk-focus-copy">{focusItem ? firmIssueExcerpt(focusItem.title || focusItem.description, 115) : !focusReady ? "Your records will be ready shortly." : location.view === "leads" ? "You can continue with your firm’s accepted work." : "Review incoming leads to start a new case."}</p>
               <button className="button workdesk-primary" type="button" disabled={navigationLocked || !focusReady}
@@ -770,7 +779,7 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
             </div>
           </div>
           {!board && listError && <Message error>{listError}{" "}<button className="subtle-link" type="button" onClick={() => setListAttempt((attempt) => attempt + 1)}>Try again</button></Message>}
-          <div className={`firm-workspace-grid${board ? " firm-board-grid" : !location.leadId && items.length === 0 ? " is-empty" : ""}`}>
+          <div style={{ minHeight: collectionFloor }} className={`firm-workspace-grid${board ? " firm-board-grid" : !location.leadId && items.length === 0 ? " is-empty" : ""}`}>
             {board ? <div className={`firm-board-canvas${filteredBoardEmpty ? " is-filtered-empty" : ""}`} inert={drawer}>
               {filteredBoardEmpty && <div className="firm-board-no-matches" role="status"><div><h2>No cases match these filters</h2>
                 <p>{[location.query && `Name or record ID: ${location.query}`, location.region, location.category].filter(Boolean).join(" · ")}</p></div>
@@ -788,7 +797,7 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
                   data-record-id={item.id} disabled={navigationLocked} aria-pressed={location.leadId === item.id} onClick={() => select(item)}>
                   <span className="firm-row-heading"><span className="firm-row-title">{item.name}</span></span>
                   <span className="firm-row-issue">{firmIssueExcerpt(item.title || item.description, 110)}</span>
-                  <span className="firm-row-context">{item.category} · {item.region}</span>
+                  <span className="firm-row-context">{item.reviewTransfer && <>Transfer offer · </>}{item.category} · {item.region}</span>
                   <FirmStatusBadge status={location.view === "cases" ? item.caseStatus ?? "open" : item.status} />
                   <time dateTime={item.createdAt}>Submitted {dateFormat.format(new Date(item.createdAt))}</time>
                   <Chevron />

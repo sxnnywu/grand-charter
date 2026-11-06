@@ -2,7 +2,7 @@ import { flushSync } from "react-dom";
 
 let activeAnimations: Animation[] = [];
 let revision = 0;
-type WorkspaceTransitionScope = "page" | "detail" | "session" | "drawer" | "record" | "collection" | "submission";
+type WorkspaceTransitionScope = "page" | "detail" | "session" | "drawer" | "record" | "collection" | "submission" | "layout";
 const motionPreference = "(prefers-reduced-motion: no-preference)";
 
 export function stopWorkspaceTransition() {
@@ -24,6 +24,7 @@ export async function animateWorkspace(scope: WorkspaceTransitionScope, update: 
     const title = item.querySelector<HTMLElement>(".request-title");
     return [item.dataset.matterId!, title ? { box: title.getBoundingClientRect(), font: parseFloat(getComputedStyle(title).fontSize) } : undefined];
   }));
+  const previousReading = scope === "layout" ? document.querySelector(".plaintiff-home-reading")?.getBoundingClientRect() : undefined;
   const leavingIntake = !!document.querySelector(".plaintiff-intake");
   const panel = document.querySelector<HTMLElement>(".firm-record-panel.is-drawer");
   const animate = (element: HTMLElement | null, frames: Keyframe[], duration = 320, delay = 0) => {
@@ -69,6 +70,13 @@ export async function animateWorkspace(scope: WorkspaceTransitionScope, update: 
       animate(nextPanel, [{ transform: "translateX(100%)" }, { transform: "translateX(0)" }]);
       animate(document.querySelector(".firm-record-panel-backdrop"), [{ opacity: 0 }, { opacity: 1 }], 260);
     }
+  } else if (scope === "layout") {
+    const reading = document.querySelector<HTMLElement>(".plaintiff-home-reading");
+    if (reading && previousReading) {
+      const next = reading.getBoundingClientRect();
+      animate(reading, [{ transform: `translate(${previousReading.left - next.left}px, ${previousReading.top - next.top}px)` }, { transform: "none" }], 600);
+    }
+    animate(document.querySelector(".plaintiff-request-navigator"), [{ opacity: .3, transform: "translateY(12px)" }, { opacity: 1, transform: "none" }], 550);
   } else if (scope === "submission") {
     animate(document.querySelector(".plaintiff-confirmation"), [
       { transform: "translateY(28px) scale(.97)", opacity: .5, transformOrigin: "center top" },

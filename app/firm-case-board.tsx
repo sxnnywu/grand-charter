@@ -253,8 +253,8 @@ function CaseColumn({ column, location, selectedId, locked, refreshVersion, onSe
           {data.items.map((lead) => <button className={`firm-case-card${selectedId === lead.id ? " is-selected" : ""}${data.newIds.has(lead.id) ? " is-new" : ""}`}
             type="button" key={lead.id} data-lead-id={lead.id} data-record-id={lead.id} disabled={locked} aria-pressed={selectedId === lead.id}
             aria-label={`Open case for ${lead.name}: ${firmIssueExcerpt(lead.title || lead.description, 100)} ${lead.category}, ${lead.region}.${showFirm ? ` Firm: ${lead.firmName ?? "Unassigned"}.` : ""}`} onClick={() => onSelect(lead)}>
-            <span className="firm-case-card-heading"><strong>{lead.name}</strong><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg></span>
-            <span className="firm-case-card-issue">{firmIssueExcerpt(lead.title || lead.description, 120)}</span>
+            <span className="firm-case-card-heading"><strong>{showFirm ? lead.title || `${lead.category} · ${lead.region}` : lead.name}</strong><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg></span>
+            <span className="firm-case-card-issue">{showFirm ? lead.name : firmIssueExcerpt(lead.title || lead.description, 120)}</span>
             <span className="firm-case-card-context">{lead.category} · {lead.region}</span>
             {showFirm && <span className="firm-case-card-context">{lead.firmName ?? "Unassigned"}</span>}
             <time dateTime={lead.createdAt}>Submitted {dateFormat.format(new Date(lead.createdAt))}</time>

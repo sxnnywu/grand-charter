@@ -6,7 +6,7 @@ import type { Lead } from "./workspace";
 import "./admin-records.css";
 
 export type Firm = { id: string; name: string };
-type AuditValues = { status?: string; caseStatus?: string; firmName?: string | null };
+type AuditValues = { status?: string; caseStatus?: string; firmName?: string | null; proposedFirmName?: string; transferStatus?: string };
 type AuditEvent = {
   id: string;
   eventType: string;
@@ -33,6 +33,10 @@ const eventDescriptions: Record<string, string> = {
   lead_accepted: "accepted this lead and opened its case.",
   lead_declined: "declined this lead.",
   lead_closed: "closed this lead without placement at a firm.",
+  case_transfer_offered: "offered this case to another firm for review.",
+  case_transfer_accepted: "accepted the case transfer.",
+  case_transfer_declined: "declined the case transfer.",
+  case_transfer_cancelled: "withdrew the transfer offer.",
   case_reassigned: "reassigned the case and linked lead.",
   case_status_changed: "updated case progress.",
 };
@@ -60,6 +64,8 @@ function eventChanges(event: AuditEvent) {
   const from = before?.status ?? before?.caseStatus;
   const to = after?.status ?? after?.caseStatus;
   if (to && from !== to) changes.push({ label: "Status", from: from ? statusLabels[from] ?? from : undefined, to: statusLabels[to] ?? to });
+  if (after?.proposedFirmName && event.eventType === "case_transfer_offered") changes.push({ label: "Offered to", to: after.proposedFirmName });
+  if (after?.transferStatus) changes.push({ label: "Transfer review", from: before?.transferStatus, to: after.transferStatus });
   return changes;
 }
 
@@ -82,14 +88,15 @@ export function AdminAssignmentActions({ lead, caseView = false, firms, locked =
   const validSelection = !!selectedFirm && (!sameFirm || canReturn);
   const showForm = canAssign && (isUnassigned || canClose || expanded);
   const busy = locked || saving;
+  const transfer = caseView && lead.transfer && ["pending", "declined"].includes(lead.transfer.status) ? lead.transfer : undefined;
   const currentFirm = lead.firmName ?? "Unassigned";
-  const submitLabel = caseView ? "Reassign case" : sameFirm && canReturn ? "Return for review" : isUnassigned ? "Assign lead" : lead.status === "declined" ? "Send for another review" : "Reassign lead";
+  const submitLabel = caseView ? "Send transfer offer" : sameFirm && canReturn ? "Return for review" : isUnassigned ? "Assign lead" : lead.status === "declined" ? "Send for another review" : "Reassign lead";
 
   useEffect(() => {
     if (outcome && showOutcome) outcomeHeading.current?.focus({ preventScroll: true });
   }, [outcome, showOutcome]);
 
-  async function update(path: string, body: Record<string, string>, kind: "assign" | "close") {
+  async function update(path: string, body: Record<string, string>, kind: "assign" | "close" | "cancel") {
     if (busy || mutationBusy.current) return;
     mutationBusy.current = true;
     setSaving(true);
@@ -99,7 +106,8 @@ export function AdminAssignmentActions({ lead, caseView = false, firms, locked =
       const { lead: updated } = await post<{ lead: Lead }>(path, body);
       const firmName = updated.firmName ?? selectedFirm?.name ?? "the selected firm";
       const message = kind === "close" ? `${updated.name}’s lead is closed without placement at a firm. The plaintiff can see the closure notice.`
-        : caseView ? `Case reassigned to ${firmName}. Its progress is unchanged.`
+        : kind === "cancel" ? `Transfer offer withdrawn. ${firmName} continues handling the case.`
+          : caseView ? `Transfer offered to ${updated.transfer?.toFirmName ?? selectedFirm?.name}. ${firmName} continues handling the case until acceptance.`
           : sameFirm && canReturn ? `Lead returned to ${firmName} for another review.`
             : `Lead assigned to ${firmName}. Awaiting firm review.`;
       setTargetFirm("");
@@ -133,6 +141,10 @@ export function AdminAssignmentActions({ lead, caseView = false, firms, locked =
       ? `${currentFirm} declined this lead. Choose a firm for another review or close the lead.`
       : isUnassigned ? "No firm is assigned. Choose a law firm to review this request."
         : caseView ? `${currentFirm} is assigned to this case.` : `${currentFirm} is reviewing this lead.`}</p>}
+    {transfer && <div className="admin-transfer-status" role="status"><p><strong>{transfer.status === "pending" ? "Transfer awaiting review" : "Transfer declined"}</strong></p>
+      <p>{transfer.toFirmName}{transfer.status === "pending" ? " can accept or decline the offer." : " declined this offer."} {currentFirm} remains responsible for the case.</p>
+      <button className="button small" type="button" disabled={busy} onClick={() => void update(`/api/cases/${lead.caseId}/transfer/cancel`, {}, "cancel")}>{transfer.status === "pending" ? "Withdraw offer" : "Resolve declined offer"}</button>
+    </div>}
     {showOutcome && outcome && <div className="admin-assignment-outcome" role="status"><p tabIndex={-1} ref={outcomeHeading}>{outcome}</p></div>}
     {showForm && <form className="form-stack admin-assignment-form" onSubmit={assign}>
       <label className="field">{isUnassigned ? "Law firm" : "Send to"}
@@ -147,10 +159,10 @@ export function AdminAssignmentActions({ lead, caseView = false, firms, locked =
         <p className="admin-assignment-transfer"><span>{currentFirm}</span><span aria-hidden="true">→</span><span className="visually-hidden">to</span><strong>{selectedFirm.name}</strong></p>
         <ul>
           {caseView ? <>
-            <li>The case and linked lead move together. Progress stays {statusLabels[lead.caseStatus ?? "open"]}.</li>
-            <li>{currentFirm} loses access. The new firm can view plaintiff-uploaded PDFs.</li>
+            <li>If the firm accepts, the case and linked lead move together. Progress stays {statusLabels[lead.caseStatus ?? "open"]}.</li>
+            <li>{currentFirm} keeps managing the case until acceptance. The receiving firm can review intake details and plaintiff-uploaded PDFs.</li>
             <li>Private notes keep their original firm ownership. Firm-shared PDFs stay available to the plaintiff and do not transfer to another firm.</li>
-            <li>The plaintiff sees an in-app reassignment notice.</li>
+            <li>The plaintiff sees an in-app transfer update.</li>
           </> : sameFirm && canReturn ? <>
             <li>The lead returns to {selectedFirm.name}’s review inbox. The original decline stays in history.</li>
             <li>The plaintiff sees an in-app update.</li>

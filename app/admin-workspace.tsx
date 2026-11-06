@@ -14,6 +14,7 @@ import { animateWorkspace } from "./workspace-motion";
 import type { Account, Lead, User } from "./workspace";
 import "./admin-workspace.css";
 import "./firm-workspace.css";
+import { WorkdeskTitle } from "./workdesk-title";
 import "./workdesk.css";
 
 type Page = { path: string; items: Lead[]; nextCursor: string | null; totalCount: number };
@@ -65,6 +66,8 @@ function withoutRecord(location: AdminLocation) {
 }
 
 export function AdminWorkspace({ user, accounts, switchAccount, signOut, sessionAction, sessionError, verifySession }: Props) {
+  const focusMemory = useRef<Partial<Record<AdminView, Lead | undefined>>>({});
+  const [collectionFloor, setCollectionFloor] = useState(360);
   const [location, setLocation] = useState(readAdminLocation);
   const locationRef = useRef(location);
   locationRef.current = location;
@@ -324,6 +327,8 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
   }
 
   function filter(changes: Partial<AdminLocation>) {
+    const collection = document.querySelector(".admin-collection");
+    if (collection) setCollectionFloor(Math.max(360, innerHeight - collection.getBoundingClientRect().top));
     const next = withoutRecord({ ...controls, ...changes });
     void navigate(next);
   }
@@ -334,7 +339,7 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
   }
 
   function select(item?: Lead) {
-    void navigate({ ...locationRef.current, leadId: item?.id, caseId: locationRef.current.view === "cases" ? item?.caseId ?? undefined : undefined });
+    void navigate({ ...locationRef.current, leadId: item?.id, caseId: locationRef.current.view === "cases" || locationRef.current.view === "attention" && item?.status === "accepted" ? item?.caseId ?? undefined : undefined });
   }
 
   async function loadMore() {
@@ -388,6 +393,9 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
   const currentBoardSummary = boardSummary?.path === path ? boardSummary.summary : undefined;
   const selectedIndex = items.findIndex(({ id }) => id === location.leadId);
   const nextReview = location.view === "attention" ? items.find((item) => item.id !== location.leadId) : undefined;
+  if (!pending && !loading && (currentPage || currentBoardSummary && !currentBoardSummary.loading && !currentBoardSummary.error)
+    && (!Object.hasOwn(focusMemory.current, location.view) || !filtered)) focusMemory.current[location.view] = items[0];
+  const focusItem = location.view === "attention" ? items[0] : focusMemory.current[location.view] ?? items[0];
   const totalAttention = counts ? counts.unassigned + counts.declined : undefined;
   const title = adminViews.find(([view]) => view === location.view)![1];
   const description = location.view === "attention" ? "Place unassigned leads with a firm and resolve declined leads."
@@ -420,18 +428,18 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
         </nav>
         <header className="admin-page-heading firm-page-heading">
           <div className="workdesk-heading-copy"><p className="workdesk-eyebrow">Platform admin · {location.view === "attention" ? "Assignment desk" : location.view === "cases" ? "Accepted work" : "Request register"}</p>
-            <h1 ref={heading} tabIndex={-1} aria-label={title}><span key={location.view} className="workdesk-heading-word" aria-hidden="true"><span>{title}</span></span></h1><p key={location.view} className="workdesk-description">{description}</p></div>
+            <h1 ref={heading} tabIndex={-1} aria-label={title}><WorkdeskTitle key={location.view} text={title} /></h1><p key={location.view} className="workdesk-description">{description}</p></div>
           <aside key={location.view} className="workdesk-focus" aria-label="Next action">
             <span className="workdesk-focus-label">{location.view === "attention" ? "Ready for a decision" : location.view === "cases" ? "Across your firms" : "From this view"}</span>
-            <p className="workdesk-focus-title">{location.view === "attention" ? totalAttention === undefined ? "Checking the queue" : totalAttention === 0 ? "Everything has a next step" : `${totalAttention} ${totalAttention === 1 ? "lead needs" : "leads need"} attention` : items[0]?.name ?? (loading ? "Getting records ready" : "No records in this view")}</p>
-            <p className="workdesk-focus-copy">{location.view === "attention" ? "Choose a firm for unassigned requests. Give declined leads a next step." : items[0] ? firmIssueExcerpt(items[0].title || items[0].description, 115) : "Use the register to review requests, assignments, and case progress."}</p>
+            <p className="workdesk-focus-title">{location.view === "attention" ? totalAttention === undefined ? "Checking the queue" : totalAttention === 0 ? "Everything has a next step" : `${totalAttention} ${totalAttention === 1 ? "lead needs" : "leads need"} attention` : focusItem?.name ?? (loading ? "Getting records ready" : "No records in this view")}</p>
+            <p className="workdesk-focus-copy">{location.view === "attention" ? "Choose a firm for unassigned requests. Give declined leads a next step." : focusItem ? firmIssueExcerpt(focusItem.title || focusItem.description, 115) : "Use the register to review requests, assignments, and case progress."}</p>
             {location.view === "attention" && <div className="workdesk-queue-counts" aria-label="Unfiltered attention counts">
               <button type="button" disabled={navigationLocked || !counts} aria-pressed={controls.status === "pending_assignment"} onClick={() => filter({ status: controls.status === "pending_assignment" ? "all" : "pending_assignment" })}><strong>{counts?.unassigned ?? "…"}</strong><span>Need a firm</span></button>
               <button type="button" disabled={navigationLocked || !counts} aria-pressed={controls.status === "declined"} onClick={() => filter({ status: controls.status === "declined" ? "all" : "declined" })}><strong>{counts?.declined ?? "…"}</strong><span>Firm declined</span></button>
             </div>}
             <button className="button workdesk-primary" type="button" disabled={locked || loading || !!listError || !currentPage && !board || board && (!currentBoardSummary || currentBoardSummary.loading || currentBoardSummary.error)}
-              onClick={() => items[0] ? select(items[0]) : changeView(location.view === "attention" ? "leads" : "attention")}>
-              {items[0] ? location.view === "attention" ? "Review next lead" : location.view === "cases" ? "Open case" : "Open lead" : location.view === "attention" ? "Browse all leads" : "View attention queue"}<span aria-hidden="true">↗</span>
+              onClick={() => focusItem ? select(focusItem) : changeView(location.view === "attention" ? "leads" : "attention")}>
+              {focusItem ? location.view === "attention" ? "Review next lead" : location.view === "cases" ? "Open case" : "Open lead" : location.view === "attention" ? "Browse all leads" : "View attention queue"}<span aria-hidden="true">↗</span>
             </button>
           </aside>
         </header>
@@ -471,7 +479,7 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
             <label>Sort<select aria-label="Sort by submission date" value={controls.sort} disabled={navigationLocked} onChange={(event) => filter({ sort: event.target.value as AdminLocation["sort"] })}><option value="oldest">Oldest submitted</option><option value="newest">Newest submitted</option></select></label>
           </div>
         </div>
-        <section className="admin-collection" aria-label={`${title} records`} aria-busy={loading || !!pending}>
+        <section className="admin-collection" style={{ minHeight: collectionFloor }} aria-label={`${title} records`} aria-busy={loading || !!pending}>
           <div className="admin-collection-summary"><p>{board ? currentBoardSummary?.totalCount === undefined ? "Cases by progress" : `${items.length} of ${currentBoardSummary.totalCount} cases shown` : currentPage ? `${items.length} of ${currentPage.totalCount} ${location.view === "cases" ? "cases" : "leads"} shown` : listError ? "Records unavailable" : "Loading records…"}</p>
             <span role="status">{pending ? pending.leadId ? "Opening record…" : "Updating results…" : loading && currentPage ? "Updating…" : ""}</span>
           </div>
@@ -489,10 +497,13 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
                 {!filtered && <button className="subtle-link" type="button" disabled={navigationLocked} onClick={() => changeView(location.view === "cases" ? "leads" : "cases")}>{location.view === "cases" ? "View all leads" : "View cases"} <span aria-hidden="true">→</span></button>}
               </div>
             </div> : <>
-              <table className="admin-table"><thead><tr><th scope="col">Plaintiff and request</th><th scope="col">{location.view === "attention" ? "Needs attention" : "Status"}</th><th scope="col">Assigned firm</th><th scope="col">Category / Province</th><th scope="col">Submitted</th></tr></thead>
-                <tbody>{items.map((item) => <tr key={item.id} data-selected={location.leadId === item.id || undefined}>
-                  <td><button className="admin-record-link" type="button" data-record-id={item.id} aria-haspopup="dialog" aria-expanded={location.leadId === item.id} aria-label={`Open ${location.view === "cases" ? "case" : "lead"} for ${item.name}`} disabled={navigationLocked || !!pending} onClick={() => select(item)}><strong>{item.name}</strong><span>{firmIssueExcerpt(item.title || item.description, 105) || item.category}</span><small className="admin-mobile-classification">{item.category} · {item.region}</small><small className="admin-mobile-assignment">{item.firmName ?? "Unassigned"} · {dateFormat.format(new Date(item.createdAt))}</small></button></td>
-                  <td>{location.view === "attention" ? <span className={`admin-attention-reason${item.status === "declined" ? " is-declined" : ""}`}>{item.status === "declined" ? "Declined by firm" : "Needs a firm"}</span> : <FirmStatusBadge status={location.view === "cases" ? item.caseStatus ?? "open" : item.status} />}</td>
+              <table className="admin-table"><thead><tr><th scope="col">{location.view === "cases" ? "Case and plaintiff" : "Request and plaintiff"}</th><th scope="col">{location.view === "attention" ? "Needs attention" : "Status"}</th><th scope="col">Assigned firm</th><th scope="col">Category / Province</th><th scope="col">Submitted</th></tr></thead>
+                <tbody>{items.map((item) => <tr key={item.id} data-selected={location.leadId === item.id || undefined} onClick={event => {
+                  if (navigationLocked || pending || (event.target as HTMLElement).closest("button, a, input, select, textarea") || window.getSelection()?.toString()) return;
+                  select(item);
+                }}>
+                  <td><button className="admin-record-link" type="button" data-record-id={item.id} aria-haspopup="dialog" aria-expanded={location.leadId === item.id} aria-label={`Open ${location.view === "cases" ? "case" : "lead"} for ${item.name}`} disabled={navigationLocked || !!pending} onClick={() => select(item)}><strong>{item.title || `${item.category} · ${item.region}`}</strong><span className="admin-record-person">{item.name}</span><span>{item.title ? `${item.category} · ${item.region}` : firmIssueExcerpt(item.description, 105)}</span><small className="admin-mobile-classification">{item.category} · {item.region}</small><small className="admin-mobile-assignment">{item.firmName ?? "Unassigned"} · {dateFormat.format(new Date(item.createdAt))}</small></button></td>
+                  <td>{location.view === "attention" ? <span className={`admin-attention-reason${item.status === "declined" ? " is-declined" : ""}`}>{item.status === "accepted" && item.transfer?.status === "declined" ? "Transfer declined" : item.status === "declined" ? "Declined by firm" : "Needs a firm"}</span> : <FirmStatusBadge status={location.view === "cases" ? item.caseStatus ?? "open" : item.status} />}</td>
                   <td className="admin-firm-cell">{item.firmName ?? <span className="admin-unassigned">Unassigned</span>}</td>
                   <td className="admin-classification"><span>{item.category}</span><small>{item.region}</small></td>
                   <td className="admin-date-cell"><time dateTime={item.createdAt}>{dateFormat.format(new Date(item.createdAt))}</time></td>
@@ -503,9 +514,9 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
             </>}
         </section>
       </div>
-      {drawer && <FirmRecordPanel drawer label={location.view === "cases" ? "Case details" : "Lead details"} busy={navigationLocked} onClose={() => select()}
+      {drawer && <FirmRecordPanel drawer label={location.caseId ? "Case details" : "Lead details"} busy={navigationLocked} onClose={() => select()}
         recordKey={`${location.leadId}:${location.caseId ?? "lead"}`}
-        identity={<><p>{location.view === "cases" ? "Case" : "Lead"}{lead?.firmName ? ` · ${lead.firmName}` : " · Unassigned"}</p><h2>{lead?.name ?? "Loading record…"}</h2>{lead && <FirmStatusBadge status={location.view === "cases" ? lead.caseStatus ?? "open" : lead.status} />}</>}
+        identity={<><p>{location.caseId ? "Case" : "Lead"}{lead?.firmName ? ` · ${lead.firmName}` : " · Unassigned"}</p><h2>{lead?.name ?? "Loading record…"}</h2>{lead && <FirmStatusBadge status={location.caseId ? lead.caseStatus ?? "open" : lead.status} />}</>}
         navigation={<div className="admin-record-navigation"><span>{selectedIndex >= 0 ? `${selectedIndex + 1} of ${items.length} shown` : "Outside current results"}</span><button className="button small" type="button" aria-label="Previous record" disabled={navigationLocked || !!pending || selectedIndex <= 0} onClick={() => select(items[selectedIndex - 1])}>←</button><button className="button small" type="button" aria-label="Next record" disabled={navigationLocked || !!pending || selectedIndex < 0 || selectedIndex >= items.length - 1} onClick={() => select(items[selectedIndex + 1])}>→</button></div>}>
         {checking && <p className="visually-hidden" role="status">Checking current access…</p>}
         {pending && <p className="visually-hidden" role="status">Opening the requested record…</p>}
@@ -514,7 +525,7 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
         {firmError && <div className="admin-drawer-message workspace-error" role="alert"><p>{firmError}</p><button className="subtle-link" type="button" onClick={() => setFirmAttempt((value) => value + 1)}>Reload firms</button></div>}
         {listError && retryLocation && <div className="admin-drawer-message workspace-error" role="alert"><p>{listError}</p><button className="subtle-link" type="button" onClick={() => void navigate(retryLocation)}>Try again</button></div>}
         {outcome && outcome.id === location.leadId && <div className="admin-drawer-outcome" role="status"><p ref={successHeading} tabIndex={-1}>{outcome.message}</p>{nextReview && <button className="button primary small" type="button" disabled={locked || loading} onClick={() => select(nextReview)}>Review next lead <span aria-hidden="true">→</span></button>}{location.view === "attention" && !nextReview && !loading && <button className="subtle-link" type="button" disabled={locked} onClick={() => select()}>Back to queue</button>}</div>}
-        {lead ? <AdminRecordDetail lead={lead} caseView={location.view === "cases"} firms={firms} locked={locked} refreshVersion={refreshVersion} onUpdated={updated} onBusyChange={setChildBusy}
+        {lead ? <AdminRecordDetail lead={lead} caseView={!!location.caseId} firms={firms} locked={locked} refreshVersion={refreshVersion} onUpdated={updated} onBusyChange={setChildBusy}
           onAccessLost={() => { void recheckRecordAccess(); }} onOpenCase={() => {
             if (lead.caseId) void navigate({ ...emptyAdminLocation("cases"), leadId: lead.id, caseId: lead.caseId });
           }} /> : !recordError && <p className="admin-drawer-message" role="status">Loading record…</p>}

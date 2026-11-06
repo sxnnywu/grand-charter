@@ -31,9 +31,9 @@
 .plaintiff-typed-heading > span { display: inline-block; }
 .plaintiff-typed-heading > i { display: inline-block; height: .75em; width: 2px; margin-left: 7px; background: currentColor; opacity: 0; }
 .plaintiff-home-description { max-width: 40ch; margin-top: 18px; color: var(--muted); font-size: 13px; line-height: 1.65; }
-.plaintiff-start-action.button { min-height: 46px; gap: 13px; padding: 12px 19px; border-radius: 30px; border-color: #273039; background: #273039; color: #fff; font-weight: 500; }
+.plaintiff-start-action.button { min-height: 46px; gap: 13px; padding: 12px 19px; border-radius: 30px; border-color: #252525; background: #252525; color: #fff; font-weight: 500; }
 .plaintiff-start-action > span { font-size: 21px; font-weight: 300; line-height: 1; }
-.plaintiff-start-action.button:hover:not(:disabled) { background: #3b4650; border-color: #3b4650; }
+.plaintiff-start-action.button:hover:not(:disabled) { background: #414141; border-color: #414141; }
 .plaintiff-home-loading { min-height: 260px; padding: 35px 0; color: var(--muted); }
 
 .plaintiff-home-start {
@@ -310,4 +310,51 @@
   .plaintiff-request-filters button { padding-inline: 9px; }
   .plaintiff-request-collection-heading { width: auto; }
   .plaintiff-home-heading h1 { font-size: clamp(35px, 7.5vw, 56px); }
+}
+
+.plaintiff-layout-bar { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 17px; }
+.plaintiff-layout-bar > span { color: var(--muted); font-size: 11px; }
+.plaintiff-layout-controls { display: flex; flex-shrink: 0; gap: 2px; padding: 3px; border: 1px solid #d9d4c9; border-radius: 24px; }
+.plaintiff-layout-controls button { padding: 7px 12px; min-height: 32px; border: 0; border-radius: 20px; background: transparent; color: #626660; font-size: 11px; }
+.plaintiff-layout-controls button[aria-pressed="true"] { background: #252525; color: #fff; }
+.plaintiff-matters-layout { min-width: 0; }
+.plaintiff-matter-kind { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 500; }
+.plaintiff-matter-kind::before { width: 5px; height: 5px; background: currentColor; border-radius: 50%; content: ""; }
+.plaintiff-matter-kind.is-request { color: #80613c; }
+.plaintiff-matter-kind.is-case { color: #356559; }
+.plaintiff-request-items .plaintiff-request-card { min-height: 95px; }
+.plaintiff-request-bottom { gap: 7px; }
+.plaintiff-request-bottom .plaintiff-status { font-size: 11px; }
+.plaintiff-request-card[data-kind="case"][aria-pressed="true"] .request-title { color: #356559; }
+.plaintiff-request-card[data-kind="request"][aria-pressed="true"] .request-title { color: #80613c; }
+.plaintiff-matters-layout.is-split { display: grid; grid-template-columns: 295px minmax(0, 1fr); align-items: start; gap: 28px; }
+.is-split .plaintiff-request-navigator { align-self: start; top: calc(var(--plaintiff-header-height) + 20px); border-top: 1px solid #d8d4c9; padding-top: 17px; background: none; backdrop-filter: none; }
+.is-split .plaintiff-request-collection-heading { width: 100%; }
+.is-split .plaintiff-request-filter-groups { display: grid; gap: 8px; width: 100%; }
+.is-split .plaintiff-kind-filters { padding-right: 0; border-right: 0; }
+.is-split .plaintiff-request-filters button { flex: 1; }
+.is-split .plaintiff-rail-controls, .is-split .plaintiff-rail-indicator { display: none; }
+.is-split .plaintiff-request-items { display: block; max-height: calc(100dvh - var(--plaintiff-header-height) - 220px); min-height: 160px; overflow-y: auto; overflow-x: hidden; overscroll-behavior-y: contain; }
+.is-split .plaintiff-request-items .plaintiff-request-card { display: block; width: 100%; min-height: 99px; padding: 20px 15px 20px 0; border-top: 1px solid #ddd8cd; }
+.is-split .plaintiff-request-items .plaintiff-request-card[aria-pressed="true"] { padding-left: 13px; background: #ebe8de; box-shadow: inset 2px 0 currentColor; }
+.is-split .plaintiff-request-copy .request-title { font-size: 21px; }
+.is-split .plaintiff-home-reading { margin: 0; scroll-margin-top: calc(var(--plaintiff-header-height) + 20px); }
+.is-split .plaintiff-record-header { grid-template-columns: minmax(0, 1fr); padding: 28px; gap: 17px; }
+.is-split .plaintiff-file-meta { display: flex; flex-wrap: wrap; padding: 0; border: 0; justify-content: start; }
+.is-split .plaintiff-record-body { grid-template-columns: minmax(0, 1fr); padding: 0 28px 28px; gap: 25px; }
+.is-split .plaintiff-record-heading h2 { font-size: clamp(29px, 3.5vw, 42px); }
+.is-split .plaintiff-record-status, .is-split .plaintiff-case-summary { min-height: 190px; }
+.is-split .plaintiff-home-overview { grid-template-columns: minmax(0, 1fr); }
+.is-split .plaintiff-home-overview-message { grid-column: 1; grid-row: auto; max-width: none; margin-top: 24px; }
+.is-split .plaintiff-home-overview-next-step, .is-split .plaintiff-home-update-date { grid-column: 1; }
+@media (max-width: 1000px) { .plaintiff-matters-layout.is-split { grid-template-columns: 250px minmax(0, 1fr); gap: 20px; } }
+@media (max-width: 760px) {
+  .plaintiff-layout-bar { align-items: start; flex-direction: column; gap: 10px; }
+  .plaintiff-matters-layout.is-split { display: block; }
+  .is-split .plaintiff-request-navigator { position: static; }
+  .is-split .plaintiff-request-items { max-height: 300px; min-height: 100px; }
+  .is-split .plaintiff-request-items .plaintiff-request-card { min-height: 85px; }
+  .is-split .plaintiff-home-reading { margin-top: 22px; }
+  .is-split .plaintiff-record-header { padding: 25px; }
+  .is-split .plaintiff-record-body { padding: 0 25px 25px; }
 }

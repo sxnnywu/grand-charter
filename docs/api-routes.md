@@ -31,7 +31,7 @@ The UI and API live in one Next.js app. Pages and API routes use the same server
 | `GET /api/cases` | Plaintiff, firm staff, admin | Lists the plaintiff's own cases, the firm's assigned cases, or cases across firms for an admin. Supports progress filters and search for staff and admins. |
 | `GET /api/cases/:id` | Plaintiff on the case, assigned firm staff, admin | Opens the case details and progress. PDFs, notes, and history use separate routes with their own access checks. |
 | `PATCH /api/cases/:id/status` | Assigned firm staff | Changes case progress using an allowed transition. |
-| `POST /api/cases/:id/reassign` | Admin | Moves the case and its linked lead together. Uses the same assignment logic as the lead route. |
+| `POST /api/cases/:id/reassign` | Admin | Offers a transfer to another firm for review. The current firm keeps ownership until acceptance. |
 | `GET /api/cases/:id/notes` | Assigned firm staff, authorized admin | Lists notes owned by the current firm for staff, or across firms for the admin. |
 | `POST /api/cases/:id/notes` | Assigned firm staff | Adds a private note owned by the staff member's firm. |
 
@@ -68,3 +68,13 @@ PDF and note lists return up to 25 records and `nextCursor`. Pass that value as 
 Creating a lead, note, or PDF requires a UUID in the `Idempotency-Key` header. Keep the same key when retrying the same submission. The server returns the original result with status `201`; reusing that key with different input returns `409`. Keys are scoped to the user and operation, stored with the write in one transaction, and retained until the database is reset. Failed transactions can be retried with the same key. The UI keeps the key with the unsent draft; refreshing or discarding that draft starts a new attempt.
 
 See the [workflow rules](workflow-rules.md) for allowed transitions and record visibility, and [identity and access](identity-and-access.md) for how the server checks each request.
+
+## Transfer offers
+
+| Route | Who | What it does |
+| --- | --- | --- |
+| `POST /api/case-transfers/:id/accept` | Receiving firm staff | Accepts this pending offer and moves the existing case and lead to the receiving firm. Keeps case progress. |
+| `POST /api/case-transfers/:id/decline` | Receiving firm staff | Declines this pending offer. The current firm keeps the case; the offer enters admin attention. |
+| `POST /api/cases/:id/transfer/cancel` | Admin | Withdraws a pending offer or resolves a declined offer. Ends the receiving firm's review access. |
+
+Transfer reviews appear in the receiving firm's lead list with `reviewTransfer: true` and transfer metadata. They have no accessible case reference in that firm's case collection until acceptance. Decisions lock the lead and verify the exact pending offer.

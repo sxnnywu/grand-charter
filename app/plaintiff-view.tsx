@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { observeScrollReveals } from "./workspace-motion";
+import { animateWorkspace, observeScrollReveals } from "./workspace-motion";
 import type { Lead } from "./workspace";
 import "./plaintiff-view.css";
 
@@ -140,7 +140,7 @@ function RequestOverview({ leads, onSelect, locked }: {
   </section>;
 }
 
-export function PlaintiffHome({ leads, loading, selectedId, record, onSelect, onStart, locked, pagination, firstName, hasDraft = false, requestState, onRequestStateChange, pendingRequest, pendingRequestState, requestKind, pendingRequestKind, onRequestKindChange, onResetFilters }: {
+export function PlaintiffHome({ leads, loading, selectedId, record, onSelect, onStart, locked, pagination, userId, firstName, hasDraft = false, requestState, onRequestStateChange, pendingRequest, pendingRequestState, requestKind, pendingRequestKind, onRequestKindChange, onResetFilters }: {
   leads: Lead[] | undefined;
   loading: boolean;
   selectedId?: string;
@@ -149,6 +149,7 @@ export function PlaintiffHome({ leads, loading, selectedId, record, onSelect, on
   onStart: () => void;
   locked: boolean;
   pagination: ReactNode;
+  userId: string;
   firstName: string;
   hasDraft?: boolean;
   onResetFilters: () => void;
@@ -160,6 +161,17 @@ export function PlaintiffHome({ leads, loading, selectedId, record, onSelect, on
   pendingRequest?: string;
   pendingRequestState?: PlaintiffRequestState;
 }) {
+  const [layout, setLayout] = useState<"rail" | "split">("rail");
+  useLayoutEffect(() => {
+    try { if (localStorage.getItem(`brief:plaintiff-layout:${userId}`) === "split") setLayout("split"); } catch {}
+  }, [userId]);
+  function changeLayout(next: "rail" | "split") {
+    if (next === layout) return;
+    void animateWorkspace("layout", () => {
+      setLayout(next);
+      try { localStorage.setItem(`brief:plaintiff-layout:${userId}`, next); } catch {}
+    });
+  }
   const home = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const reading = useRef<HTMLElement>(null);
@@ -194,10 +206,10 @@ export function PlaintiffHome({ leads, loading, selectedId, record, onSelect, on
   useLayoutEffect(() => {
     if (firstSelection.current) { firstSelection.current = false; return; }
     if (!selectedId) { window.scrollTo({ top: 0, behavior: reduced() ? "instant" : "smooth" }); return; }
-    if (window.scrollY < 100) return;
+    if (window.scrollY < 100 && !(layout === "split" && matchMedia("(max-width: 760px)").matches)) return;
     const timer = window.setTimeout(() => reading.current?.scrollIntoView({ block: "start", behavior: reduced() ? "instant" : "smooth" }), reduced() ? 0 : 500);
     return () => window.clearTimeout(timer);
-  }, [selectedId]);
+  }, [selectedId, layout]);
 
   useLayoutEffect(() => {
     requestItems.current?.scrollTo({ left: 0, behavior: "instant" });
@@ -235,6 +247,11 @@ export function PlaintiffHome({ leads, loading, selectedId, record, onSelect, on
     </header>
     {!leads ? <div className="plaintiff-home-loading" role="status">{loading ? "Loading your requests…" : "Your requests will appear here once they load."}</div>
       : empty ? <StartingPoint firstName={firstName} onStart={onStart} locked={locked} hasDraft={hasDraft} /> : <>
+      <div className="plaintiff-layout-bar"><span>Browse your requests and cases</span><div className="plaintiff-layout-controls" role="group" aria-label="Workspace layout">
+        <button type="button" aria-pressed={layout === "rail"} onClick={() => changeLayout("rail")}>Horizontal</button>
+        <button type="button" aria-pressed={layout === "split"} onClick={() => changeLayout("split")}>Split view</button>
+      </div></div>
+      <div className={`plaintiff-matters-layout is-${layout}`}>
       <section className="plaintiff-request-navigator" aria-labelledby="plaintiff-requests-heading" aria-busy={loading || !!pendingRequestState || !!pendingRequestKind}>
         <div className="plaintiff-request-toolbar">
           <div className="plaintiff-request-collection-heading"><h2 id="plaintiff-requests-heading">Your matters</h2>
@@ -264,14 +281,14 @@ export function PlaintiffHome({ leads, loading, selectedId, record, onSelect, on
         <div className="plaintiff-request-items" ref={requestItems} onScroll={measureRail}>
           {!loading && !leads.length && <div className="plaintiff-list-empty" role="status"><p>No {requestState === "all" ? "" : `${requestState} `}{requestKind === "all" ? "matters" : requestKind}.</p>
             <button className="subtle-link" type="button" disabled={locked} onClick={onResetFilters}>Clear filters</button></div>}
-          {leads.map((lead, index) => <button className="request-card plaintiff-request-card" key={lead.id} data-matter-id={lead.id} type="button"
+          {leads.map((lead, index) => <button className="request-card plaintiff-request-card" key={lead.id} data-matter-id={lead.id} data-kind={lead.caseId ? "case" : "request"} type="button"
             style={{ "--request-order": Math.min(index, 5) } as CSSProperties}
             aria-label={`Open ${lead.caseId ? "case" : "request"}: ${plaintiffRequestTitle(lead)}. ${lead.category}. ${plaintiffStatus(lead).label}. Submitted ${dateFormat.format(new Date(lead.createdAt))}.`}
             aria-pressed={selectedId === lead.id} aria-busy={pendingRequest === lead.id}
             data-pending={pendingRequest === lead.id || undefined} disabled={locked} onClick={() => onSelect(lead.id, lead.caseId ?? undefined)}>
             <span className="request-copy plaintiff-request-copy">
               <strong className="request-title">{plaintiffRequestTitle(lead)}</strong>
-              <span className="plaintiff-request-bottom"><span className="plaintiff-matter-kind">{lead.caseId ? "Case" : "Request"}</span><span aria-hidden="true">·</span><StatusText lead={lead} /></span>
+              <span className="plaintiff-request-bottom"><span className={`plaintiff-matter-kind is-${lead.caseId ? "case" : "request"}`}>{lead.caseId ? "Case" : "Request"}</span><span aria-hidden="true">·</span><StatusText lead={lead} /></span>
             </span>
           </button>)}
           {pagination}
@@ -284,6 +301,7 @@ export function PlaintiffHome({ leads, loading, selectedId, record, onSelect, on
             : <div className="plaintiff-overview-empty"><p>{loading ? "Loading your requests…" : `You have no ${requestState} requests.`}</p></div>}
         </div>
       </section>
+      </div>
     </>}
   </div>;
 }

@@ -133,13 +133,45 @@ export function reassignCase(user: User, id: string, selectedFirmId: unknown) {
     const firm = await findFirm(client, firmId);
     if (lead.firmId === firm.id) throw new RequestError(409, "This case is already assigned to that firm.");
 
-    return updateAssignment(client, lead, user.id, {
-      status: lead.status,
-      firm,
-      eventType: "case_reassigned",
-      message: `Your case was reassigned to ${firm.name}.`,
-      caseId: id,
-    });
+    const { rows: [previous] } = await client.query("SELECT * FROM case_transfers WHERE case_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1 FOR UPDATE", [id]);
+    if (previous?.status === "pending" && previous.to_firm_id === firm.id) {
+      const { rows: [current] } = await client.query(`${leadDetails} WHERE l.id = $1`, [lead.id]);
+      return current;
+    }
+    if (previous && ["pending", "declined"].includes(previous.status)) {
+      await client.query("UPDATE case_transfers SET status = 'cancelled', decided_by = $2, decided_at = clock_timestamp() WHERE id = $1", [previous.id, user.id]);
+      await client.query(`INSERT INTO audit_events (lead_id, event_type, actor_user_id, before_values, after_values)
+        VALUES ($1, 'case_transfer_cancelled', $2, $3, $4)`, [lead.id, user.id, { transferStatus: previous.status }, { transferStatus: "cancelled" }]);
+    }
+    const { rows: [offer] } = await client.query(`INSERT INTO case_transfers (case_id, from_firm_id, to_firm_id, offered_by, created_at)
+      VALUES ($1, $2, $3, $4, clock_timestamp()) RETURNING id`, [id, lead.firmId, firm.id, user.id]);
+    const currentFirm = await findFirm(client, lead.firmId!);
+    await client.query(`INSERT INTO audit_events (lead_id, event_type, actor_user_id, before_values, after_values)
+      VALUES ($1, 'case_transfer_offered', $2, $3, $4)`, [lead.id, user.id, { firmName: currentFirm.name },
+        { firmName: currentFirm.name, proposedFirmName: firm.name, transferStatus: "pending", transferId: offer.id }]);
+    await client.query("INSERT INTO plaintiff_notices (lead_id, message) VALUES ($1, $2)", [lead.id,
+      `${firm.name} is reviewing a transfer offer for your case. ${currentFirm.name} continues handling it until another firm accepts.`]);
+    const { rows: [updated] } = await client.query(`${leadDetails} WHERE l.id = $1`, [lead.id]);
+    return updated;
+  });
+}
+
+export function cancelCaseTransfer(user: User, id: string) {
+  assertAdmin(user);
+  if (!isUuid(id)) throw new RequestError(404, "Case not found.");
+  return transaction(async client => {
+    const { rows: [record] } = await client.query("SELECT lead_id FROM cases WHERE id = $1", [id]);
+    if (!record) throw new RequestError(404, "Case not found.");
+    const lead = await lockLead(client, record.lead_id);
+    const { rows: [offer] } = await client.query("SELECT * FROM case_transfers WHERE case_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1 FOR UPDATE", [id]);
+    if (!offer || !["pending", "declined"].includes(offer.status)) throw new RequestError(409, "There is no transfer offer to withdraw.");
+    await client.query("UPDATE case_transfers SET status = 'cancelled', decided_by = $2, decided_at = clock_timestamp() WHERE id = $1", [offer.id, user.id]);
+    await client.query(`INSERT INTO audit_events (lead_id, event_type, actor_user_id, before_values, after_values)
+      VALUES ($1, 'case_transfer_cancelled', $2, $3, $4)`, [lead.id, user.id, { transferStatus: offer.status }, { transferStatus: "cancelled" }]);
+    const firm = await findFirm(client, lead.firmId!);
+    await client.query("INSERT INTO plaintiff_notices (lead_id, message) VALUES ($1, $2)", [lead.id, `The transfer offer was withdrawn. ${firm.name} continues handling your case.`]);
+    const { rows: [updated] } = await client.query(`${leadDetails} WHERE l.id = $1`, [lead.id]);
+    return updated;
   });
 }
 

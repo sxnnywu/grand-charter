@@ -309,3 +309,5 @@
 }
 
 .plaintiff-case-status-heading .plaintiff-status { font-family: var(--display-font); font-size: clamp(25px, 3vw, 32px); font-weight: 400; }
+
+.plaintiff-transfer-notice { grid-column: 1 / -1; padding-block: 14px; border-block: 1px solid var(--line); font-size: 12px; color: var(--muted); line-height: 1.7; }

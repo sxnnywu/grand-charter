@@ -72,6 +72,7 @@ function RequestCover({ lead, close, locked }: { lead: Lead; close: () => void; 
       </h2>
       <p className="plaintiff-file-preview">{lead.description}</p>
     </div>
+    {lead.transfer && ["pending", "declined"].includes(lead.transfer.status) && <p className="plaintiff-transfer-notice">{lead.transfer.status === "pending" ? `${lead.transfer.toFirmName} is considering a transfer.` : `${lead.transfer.toFirmName} declined the transfer.`} {lead.firmName} continues handling your case.</p>}
     <div className="plaintiff-file-meta">
       <span>Submitted <time dateTime={lead.createdAt}>{dateFormat.format(new Date(lead.createdAt))}</time></span>
       <span>{lead.firmName ?? "No law firm assigned"}</span>

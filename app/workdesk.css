@@ -19,16 +19,14 @@
 .workdesk .firm-page-heading h1, .workdesk .admin-page-heading h1 {
   margin: 0; color: #242b35; font: 400 clamp(52px, 6vw, 80px)/1.06 var(--display-font); letter-spacing: -.045em; overflow-wrap: anywhere;
 }
-.workdesk-heading-word { display: inline-block; max-width: 100%; overflow: clip; vertical-align: bottom; }
-.workdesk-heading-word > span { display: inline-block; max-width: 100%; }
 .workdesk .firm-page-heading .workdesk-description { max-width: 43ch; margin-top: 20px; color: var(--muted); font-size: 14px; line-height: 1.75; }
 .workdesk-focus { position: relative; min-width: 0; padding: 25px 0 25px 30px; border-left: 1px solid var(--desk-rule); }
 .workdesk-focus-label { display: block; margin-bottom: 13px; color: var(--muted); font-size: 11px; }
 .workdesk .workdesk-focus .workdesk-focus-title { margin: 0; color: var(--ink); font: 400 clamp(26px, 2.6vw, 35px)/1.15 var(--display-font); letter-spacing: -.03em; overflow-wrap: anywhere; }
 .workdesk .workdesk-focus .workdesk-focus-copy { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
-.workdesk .workdesk-primary { display: inline-flex; align-items: center; gap: 22px; min-height: 42px; margin-top: 21px; padding: 11px 17px; border: 1px solid #28333c; border-radius: 25px; background: #28333c; color: #fffdf7; font-size: 12px; font-weight: 500; }
+.workdesk .workdesk-primary { display: inline-flex; align-items: center; gap: 22px; min-height: 42px; margin-top: 21px; padding: 11px 17px; border: 1px solid #252525; border-radius: 25px; background: #252525; color: #fff; font-size: 12px; font-weight: 500; }
 .workdesk .workdesk-primary > span { font-size: 18px; line-height: 1; }
-.workdesk .workdesk-primary:hover:not(:disabled) { background: #3c4a55; border-color: #3c4a55; }
+.workdesk .workdesk-primary:hover:not(:disabled) { background: #414141; border-color: #414141; }
 .workdesk-queue-counts { display: flex; gap: 28px; margin-top: 15px; }
 .workdesk-queue-counts button { display: flex; align-items: baseline; gap: 9px; padding: 5px 0; border: 0; border-bottom: 1px solid transparent; background: none; color: var(--muted); text-align: left; }
 .workdesk-queue-counts button[aria-pressed="true"] { color: var(--indigo); border-bottom-color: var(--indigo); }
@@ -125,7 +123,6 @@
   .workdesk .firm-case-card:hover:not(:disabled) { transform: translateY(-3px); border-color: #b9b09d; background: #fffdf7; box-shadow: 0 8px 20px #3e3b3009; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .workdesk-heading-word > span { animation: desk-title-arrive 800ms cubic-bezier(.22, 1, .36, 1) both; }
   .workdesk-eyebrow { animation: desk-copy-arrive 600ms both; }
   .workdesk-description { animation: desk-copy-arrive 700ms 130ms both; }
   .workdesk-focus { animation: desk-focus-arrive 800ms 170ms cubic-bezier(.22, 1, .36, 1) both; }
@@ -144,7 +141,6 @@
   .workdesk .firm-record-panel-close { transition: transform 200ms, background-color 200ms; }
   .workdesk .firm-record-panel-close:hover:not(:disabled) { transform: rotate(8deg); }
 }
-@keyframes desk-title-arrive { from { transform: translateY(110%); } to { transform: none; } }
 @keyframes desk-copy-arrive { from { opacity: .2; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 @keyframes desk-focus-arrive { from { opacity: .4; transform: translateX(20px); } to { opacity: 1; transform: none; } }
 @keyframes desk-ledger-arrive { from { transform: translateY(22px); } to { transform: none; } }
@@ -206,3 +202,26 @@
 @media (prefers-reduced-motion: reduce) {
   .workdesk *, .workdesk *::before, .workdesk *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+.admin-transfer-status { display: grid; gap: 10px; margin-block: 16px; padding: 17px 0; border-block: 1px solid #d8d2c5; font-size: 12px; line-height: 1.7; }
+.admin-transfer-status .button { justify-self: start; margin-top: 5px; }
+.firm-transfer-context { padding: 20px; margin-bottom: 24px; background: #efede4; border-radius: 5px; }
+.firm-transfer-context p { margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.75; }
+
+.workdesk .admin-table tbody tr { cursor: pointer; }
+.workdesk .firm-review-actions .button, .workdesk .firm-record-outcome-actions .button { min-height: 40px; padding: 10px 16px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+.workdesk .firm-review-actions .button.danger { color: #252525; background: #fff; border-color: #d1d1d1; }
+.workdesk-typed-title { display: inline; }
+.workdesk-title-word { display: inline-block; white-space: nowrap; margin-right: .2em; }
+.workdesk-title-word:last-of-type { margin-right: 0; }
+.workdesk-title-word > span { display: inline-block; }
+.workdesk-typed-title > i { display: inline-block; width: 2px; height: .75em; margin-left: 6px; background: currentColor; opacity: 0; }
+@media (prefers-reduced-motion: no-preference) {
+  .workdesk-title-word > span { animation: desk-type-character 1ms calc(80ms + var(--letter) * 36ms) both; }
+  .workdesk-typed-title > i { animation: desk-type-cursor 280ms 400ms 2; }
+  .workdesk .firm-page-heading .workdesk-description { animation-delay: 370ms; }
+  .workdesk .workdesk-focus { animation-delay: 430ms; }
+  .workdesk .firm-record-panel-identity { animation: desk-section-arrive 550ms 60ms cubic-bezier(.22, 1, .36, 1) both; }
+}
+@keyframes desk-type-character { from { opacity: 0; } to { opacity: 1; } }
+@keyframes desk-type-cursor { from, 49% { opacity: 1; } 50%, to { opacity: 0; } }

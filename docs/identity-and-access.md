@@ -4,7 +4,7 @@
 
 | Decision | What we chose | Tradeoff |
 | --- | --- | --- |
-| Sign-in | Seed accounts for two plaintiffs, staff at two firms, and an admin. Each account has access based on its role and firm. | Seeded accounts make local setup easy. A managed sign-in provider could handle registration and account recovery, but would add setup. |
+| Sign-in | Seed representative accounts for plaintiffs, staff at six firms, and an admin. Each account has access based on its role and firm. | Seeded accounts make local setup easy. A managed sign-in provider could handle registration and account recovery, but would add setup. |
 | Sessions | Keep sessions on the server. The browser sends a cookie with a session ID, and the server uses it to find the user and check their current role and firm. | The server looks up the session on each request, which lets it end a session immediately. A signed token can skip that lookup, but ending it early or keeping its role and firm up to date takes extra work. |
 | Firm access | Assign work to a firm. Its attorneys and paralegals can work on the same case. The current firm can see plaintiff uploads and the PDFs and notes its own staff added. The plaintiff keeps access to PDFs shared with them after reassignment. | Colleagues can pick up each other's cases. Giving access to specific staff on each case would offer more control, but someone would have to keep those assignments up to date. |
 | Admin access | Admins can manage assignments and review audit history. Authorized admins can read firm notes. PDF access is limited to the plaintiff and eligible firm staff. | This limits who can read sensitive PDFs. Admins who need to investigate a document issue would have to work with someone who can open it. |
@@ -28,3 +28,5 @@ sequenceDiagram
     App-->>Alex: Deny the PDF request
     Note over App,Files: The app reads the PDF only if the user has access
 ```
+
+Incoming transfer review grants access to intake details and plaintiff-uploaded PDFs only. The current firm remains the case owner until acceptance. Case reads, progress updates, private notes, and PDF uploads continue checking the current owner. Review access ends when the offer is withdrawn or replaced.

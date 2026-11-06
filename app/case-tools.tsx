@@ -511,25 +511,24 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
         {staff && nextStatus && (
           <div className="case-progress-action">
             <button className={nextStatus === "closed" ? "button danger small" : "button primary small"}
-              type="button" disabled={busy || (nextStatus === "closed" && hasDraft)} onClick={() => {
+              type="button" disabled={busy} onClick={() => {
                 if (nextStatus === "closed") closeDialog.current?.showModal();
                 else void updateProgress();
               }}>
               {action === "progress" ? "Updating…" : nextStatus === "closed" ? "Close case" : "Start work"}
             </button>
-            {nextStatus === "closed" && hasDraft && <p className="detail-copy">Finish or clear your unsent work before closing this case.</p>}
             {nextStatus === "closed" && (
               <dialog ref={closeDialog} aria-labelledby="close-case-title" aria-describedby="close-case-description">
-                <div className="dialog-head"><h2 id="close-case-title">Close this case?</h2></div>
+                <div className="dialog-head"><h2 id="close-case-title">{hasDraft ? "You have unsent work" : "Close this case?"}</h2></div>
                 <div className="dialog-body"><p id="close-case-description">
-                  The plaintiff will see that this case is closed. Existing PDFs and notes stay available to people with access.
+                  {hasDraft ? "Save or clear your private note or selected PDF before closing this case. Your unsent work is still here." : "The plaintiff will see that this case is closed. Existing PDFs and notes stay available to people with access."}
                 </p></div>
                 <form className="dialog-footer" method="dialog">
-                  <button className="button" type="submit">Cancel</button>
-                  <button className="button primary danger" type="button" disabled={busy || hasDraft} onClick={() => {
+                  <button className="button" type="submit">{hasDraft ? "Keep editing" : "Cancel"}</button>
+                  {!hasDraft && <button className="button primary danger" type="button" disabled={busy || hasDraft} onClick={() => {
                     closeDialog.current?.close();
                     void updateProgress();
-                  }}>Close case</button>
+                  }}>Close case</button>}
                 </form>
               </dialog>
             )}

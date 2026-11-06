@@ -488,3 +488,11 @@ h1 { font-family: var(--display-font); font-weight: 400; }
 @keyframes workspace-heading-arrive { from { transform: translateY(12px); } to { transform: none; } }
 
 :is(.demo-portal, .firm-shell, .admin-shell) .admin-record-detail h3 { font-size: 21px; line-height: 1.25; letter-spacing: -.025em; }
+
+/* Actions use one neutral palette; status colors remain informational. */
+:root { --indigo: #252525; --indigo-pale: #eae8e1; }
+:is(.button.primary, .button.primary.danger) { background: #252525; border-color: #252525; color: #fff; }
+:is(.button.primary, .button.primary.danger):hover:not(:disabled) { background: #414141; border-color: #414141; }
+.button:not(.primary) { color: #28333c; border-color: #d3cec2; }
+:is(.demo-portal, .admin-shell) :is(.nav-item, .staff-tab, .subtle-link, .case-content-tab, .account-option, .firm-navigation button, .firm-layout-controls button, .admin-navigation button) { color: #28333c; }
+.workdesk .admin-record-link .admin-record-person { color: #28333c; font-size: 13px; font-weight: 500; }

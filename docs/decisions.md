@@ -9,7 +9,7 @@ The [assignment](assignment.md) defines required behavior. This log records choi
 | Accepted leads | Keep the lead in an Accepted view while the firm is assigned. Staff can open the linked case from there. |
 | Declined leads | The firm has read-only access while assigned. The admin can reassign or close the lead. To correct a mistaken decline, the admin can assign it back to the same firm for review. |
 | Plaintiff notices | Show a persistent in-app notice after admin reassignment or closure of a lead. Notifications outside the app are out of scope. |
-| Case progress and reassignment | Use Open, In progress, and Closed. Move the case and its linked lead together and preserve case progress. |
+| Case progress and reassignment | Use New case, In progress, and Closed. Offer a transfer for the receiving firm to accept or decline. The current firm keeps ownership until acceptance; the same case and lead then move together with progress preserved. |
 | PDF sharing | Plaintiffs can upload PDFs before acceptance. Their uploads follow the case. PDFs shared by a former firm stay visible to the plaintiff, who can upload a copy for the new firm if needed. Requests to a former firm are out of scope. |
 | Admin PDF access | Admins can manage assignments and review case records, audit history, and authorized firm notes. PDF access is limited to the plaintiff and eligible firm staff. |
 | Returning firm | If a case returns to a firm, the firm can read the private notes it wrote during an earlier assignment. |
