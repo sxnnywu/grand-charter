@@ -1,6 +1,6 @@
-# Seed data proposal
+# Starter data
 
-Proposed replacement for the current starter data. This plan has not been seeded.
+Implemented by `db/seed.sql`, `db/workspace-data.mjs`, and `scripts/seed-workspace.mjs`. The counts below describe a fresh database. Reseeding preserves existing requests, case progress, transfers, notes, and uploads; local counts can be higher.
 
 ## Size
 
@@ -24,7 +24,7 @@ Proposed replacement for the current starter data. This plan has not been seeded
 | Closed without a case | 2 |
 | Accepted, with a linked case | 18 |
 
-The 18 cases comprise five new cases, nine in progress, and four closed cases. Acceptance stays visible in lead history; it does not create a second inquiry.
+The 18 cases comprise five new cases, nine in progress, and four closed cases. They include a pending transfer, a declined transfer awaiting admin review, and an accepted transfer with former-firm documents and notes. Acceptance stays visible in lead history; it does not create a second inquiry.
 
 ## Firms and routing
 
@@ -44,7 +44,7 @@ Give every firm reviewable leads and accepted cases. Vary the case mix rather th
 ## People and matters
 
 - Maya has a dismissal request awaiting review and a housing case in progress. Use different titles, descriptions, dates, firms, and documents so they read as separate matters.
-- Jordan has no requests and starts at the intake form.
+- Jordan has no requests and starts at the intake entry point.
 - The other 38 plaintiffs each have one request. Use varied names and descriptions rather than numbered people or repeated Maya records.
 - Example titles: “Unpaid overtime,” “Deposit not returned,” “Outstanding contractor invoice,” and “Injury after a fall.” Leave four titles blank to exercise the category fallback.
 - Include all four provinces and categories, with submission dates spread over six weeks. Keep every event and document timestamp in a sensible sequence.
@@ -71,6 +71,6 @@ Explain the account scenarios on the sign-in page and in the repository guide. D
 
 ## Applying this plan
 
-Use stable IDs and repeatable inserts. Ordinary seeding must not overwrite later workflow changes. Generate PDF files as part of the documented setup so a fresh checkout includes working document examples.
+Use stable IDs and repeatable inserts. Ordinary seeding must not overwrite later workflow changes. The 50 source PDFs live under `db/fixtures/documents`. Seeding copies missing files into private storage and inserts their metadata. Node.js and Postgres are sufficient to run setup; Python is not required.
 
 Replacing existing local records is a separate reset. Do not reset the current database just to apply UI changes.

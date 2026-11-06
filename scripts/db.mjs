@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { loadEnvFile } from 'node:process';
 import pg from 'pg';
+import { seedWorkspace } from './seed-workspace.mjs';
 
 const { Client } = pg;
 
@@ -51,6 +52,7 @@ async function main() {
       await migrate(client);
     } else {
       await client.query(await readFile(new URL('../db/seed.sql', import.meta.url), 'utf8'));
+      await seedWorkspace(client);
     }
     await client.query('COMMIT');
     console.log(command === 'migrate' ? 'Migrations are up to date.' : 'Initial data is ready.');
