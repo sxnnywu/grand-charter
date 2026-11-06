@@ -1,0 +1,29 @@
+README.md
+  s_079498f144b51a::t_f58415739ce35d 44-45
+app/admin-navigation.ts
+  s_079498f144b51a::t_922c84d069a70b 12,25,35,52
+app/admin-workspace.css
+  s_079498f144b51a::t_46089e06095620 67-68
+app/admin-workspace.tsx
+  s_079498f144b51a::t_b7b765fe002551 10,16,77-80,114,123-124,195-196,203,211,318-323,361,385-386,421-425,451,456,460-465
+app/firm-case-board.tsx
+  s_079498f144b51a::t_bafd1009affd9f 18-19,25-26,40,45-46,60,74,78,103,153-155,255,259,306-308
+app/firm-workspace.tsx
+  s_079498f144b51a::t_45ebe5dbecd006 10,242,281,305,335,469
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9f3617b75bceca49e8241f45160ee80348cff2fa",
+  "prompts": {},
+  "sessions": {
+    "s_079498f144b51a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1a8ad-f620-7f02-8c39-3413c6747d65",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Sunny Wu <w.sunny0618@gmail.com>"
+    }
+  }
+}
