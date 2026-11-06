@@ -66,7 +66,7 @@ export function AccountSwitcher({ user, accounts, disabled, switching, onSwitch 
         <span>{switching ? "Switching…" : "Switch account"}</span>
         <Icon name="down" size={14} />
       </summary>
-      <div className="account-menu" aria-label="Demo accounts">
+      <div className="account-menu" aria-label="Accounts">
         {accountGroups.map(({ title, roles }) => {
           const group = accounts.filter((account) => roles.includes(account.role));
           return group.length > 0 && <div className="account-group" key={title}>

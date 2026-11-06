@@ -51,7 +51,7 @@ export function DemoAccountGuide({ accounts, unavailable, disabled, selectedEmai
       aria-haspopup="dialog" onClick={() => {
         dialog.current?.showModal();
         heading.current?.focus({ preventScroll: true });
-      }}>About the demo accounts <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none"
+      }}>About the accounts <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none"
         stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><circle cx="12" cy="12" r="9" /><path d="M12 11v6m0-10v.01" /></svg></button>
     <dialog className="demo-account-dialog" ref={dialog} aria-labelledby="demo-account-guide-title"
       aria-describedby="demo-account-guide-intro" onClose={() => {
@@ -66,19 +66,18 @@ export function DemoAccountGuide({ accounts, unavailable, disabled, selectedEmai
       }}>
       <header className="demo-account-guide-heading">
         <div>
-          <h2 id="demo-account-guide-title" ref={heading} tabIndex={-1}>About the demo accounts</h2>
-          <p id="demo-account-guide-intro">Choose what you’d like to try.</p>
+          <h2 id="demo-account-guide-title" ref={heading} tabIndex={-1}>About the accounts</h2>
+          <p id="demo-account-guide-intro">Choose an account by role.</p>
         </div>
-        <button className="icon-button" type="button" aria-label="Close demo account guide" onClick={() => dialog.current?.close()}>
+        <button className="icon-button" type="button" aria-label="Close account guide" onClick={() => dialog.current?.close()}>
           <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="m6 6 12 12M18 6 6 18" /></svg>
         </button>
       </header>
       <div className="demo-account-guide-content">
-        <p className="demo-account-guide-note">This describes each account before testing. Your changes are saved.</p>
         {!accounts && <p className="demo-account-availability" role="status">{unavailable
           ? "Accounts could not be loaded. Close this guide and choose Try again on sign-in."
           : "Loading available accounts…"}</p>}
-        {accounts?.length === 0 && <p className="demo-account-availability" role="status">No demo accounts are available. Check the setup instructions.</p>}
+        {accounts?.length === 0 && <p className="demo-account-availability" role="status">No accounts are available. Check the setup instructions.</p>}
         {groups.map((group) => <section className="demo-account-guide-group" key={group.name} aria-label={group.name}>
           <h3>{group.name}</h3>
           {group.note && <p className="demo-account-group-note">{group.note}</p>}
@@ -92,8 +91,8 @@ export function DemoAccountGuide({ accounts, unavailable, disabled, selectedEmai
                 {selectedEmail === profile.email && <span className="demo-account-selected">Selected</span>}
               </div>
               <dl className="demo-account-context">
-                <div><dt>Starts with</dt><dd><ul>{profile.start.map((item) => <li key={item}>{item}</li>)}</ul></dd></div>
-                <div><dt>Try</dt><dd>{profile.try}</dd></div>
+                <div><dt>Initial workspace</dt><dd><ul>{profile.start.map((item) => <li key={item}>{item}</li>)}</ul></dd></div>
+                <div><dt>Actions</dt><dd>{profile.try}</dd></div>
               </dl>
               <button className="button small" type="button" disabled={disabled || !available}
                 aria-label={`Choose ${name}`} onClick={() => {

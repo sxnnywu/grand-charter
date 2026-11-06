@@ -268,11 +268,11 @@ export function Workspace() {
         </header>
         {sessionError && <Message error>{sessionError}</Message>}
         <p className="visually-hidden" role="status">
-          {session ? "Demo accounts ready." : sessionError ? "" : "Loading demo accounts…"}
+          {session ? "Accounts ready." : sessionError ? "" : "Loading accounts…"}
         </p>
         <form className="form-stack" onSubmit={signIn} aria-busy={!session && !sessionError}>
           <div>
-            <label className="field">Demo account
+            <label className="field">Account
               <select ref={demoAccountSelect} name="email" required value={demoEmail}
                 onChange={(event) => setDemoEmail(event.target.value)} disabled={!session || !!sessionAction}>
                 <option value="" disabled>{session ? "Choose an account" : sessionError ? "Accounts unavailable" : "Loading accounts…"}</option>
@@ -292,7 +292,6 @@ export function Workspace() {
             {!session && sessionError ? "Try again" : sessionAction === "sign-in" ? "Signing in…" : "Sign in"} <Icon name="arrow" size={16} />
           </button>
         </form>
-        <p className="demo-notice">Use fictional information in this demo.</p>
       </section>
     </main>
     </div>

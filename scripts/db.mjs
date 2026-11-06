@@ -53,7 +53,7 @@ async function main() {
       await client.query(await readFile(new URL('../db/seed.sql', import.meta.url), 'utf8'));
     }
     await client.query('COMMIT');
-    console.log(command === 'migrate' ? 'Migrations are up to date.' : 'Demo data is ready.');
+    console.log(command === 'migrate' ? 'Migrations are up to date.' : 'Initial data is ready.');
   } finally {
     // Closing the connection rolls back any transaction that failed before commit.
     await client.end();

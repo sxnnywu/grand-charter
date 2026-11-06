@@ -6,9 +6,9 @@ The UI and API live in one Next.js app. Pages and API routes use the same server
 
 | Route | Who | What it does |
 | --- | --- | --- |
-| `GET /api/session` | Anyone | Returns the current session and the available demo accounts. |
-| `POST /api/session` | Reviewer with seeded demo credentials | Signs in as the selected demo account and starts a server session. |
-| `DELETE /api/session` | Signed-in user | Ends the current session so the reviewer can sign in as another account. |
+| `GET /api/session` | Anyone | Returns the current session and the available accounts. |
+| `POST /api/session` | User with seeded credentials | Signs in as the selected account and starts a server session. |
+| `DELETE /api/session` | Signed-in user | Ends the current session so the user can sign in as another account. |
 
 ## Leads
 
@@ -61,6 +61,6 @@ The case board requests each progress status separately so a full column does no
 
 PDF and note lists return up to 25 records and `nextCursor`. Pass that value as `?before=...` for the next page. A cursor only works within the record and content the user can access.
 
-Creating a lead, note, or PDF requires a UUID in the `Idempotency-Key` header. Keep the same key when retrying the same submission. The server returns the original result with status `201`; reusing that key with different input returns `409`. Keys are scoped to the user and operation, stored with the write in one transaction, and retained until the demo database is reset. Failed transactions can be retried with the same key. The UI keeps the key with the unsent draft; refreshing or discarding that draft starts a new attempt.
+Creating a lead, note, or PDF requires a UUID in the `Idempotency-Key` header. Keep the same key when retrying the same submission. The server returns the original result with status `201`; reusing that key with different input returns `409`. Keys are scoped to the user and operation, stored with the write in one transaction, and retained until the database is reset. Failed transactions can be retried with the same key. The UI keeps the key with the unsent draft; refreshing or discarding that draft starts a new attempt.
 
 See the [workflow rules](workflow-rules.md) for allowed transitions and record visibility, and [identity and access](identity-and-access.md) for how the server checks each request.

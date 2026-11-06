@@ -49,7 +49,7 @@ export async function demoAccounts() {
 
 export async function signIn(request: NextRequest, body: Record<string, unknown>) {
   if (typeof body.email !== "string" || body.password !== demoPassword) {
-    throw new RequestError(401, "That demo email or password is incorrect.");
+    throw new RequestError(401, "That email or password is incorrect.");
   }
   const { rows } = await db().query<User>(
     `SELECT ${userColumns}
@@ -58,7 +58,7 @@ export async function signIn(request: NextRequest, body: Record<string, unknown>
     [body.email.trim().toLowerCase()],
   );
   const user = rows[0];
-  if (!user) throw new RequestError(401, "That demo email or password is incorrect.");
+  if (!user) throw new RequestError(401, "That email or password is incorrect.");
 
   const session = await db().query<{ id: string }>(
     `WITH previous_session AS (DELETE FROM sessions WHERE id = $1)

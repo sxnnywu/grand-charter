@@ -1,5 +1,9 @@
 @import "../prototype/styles.css";
 
+:root {
+  --display-font: var(--font-geist), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
 .visually-hidden {
   position: absolute;
   width: 1px;

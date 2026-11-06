@@ -18,7 +18,7 @@ INSERT INTO routing_rules (category, region, firm_id) VALUES
 ON CONFLICT (category, region) DO NOTHING;
 
 -- Maya demonstrates returning to existing work. Jordan starts without requests.
--- Fixed IDs make reruns safe without resetting later demo activity.
+-- Fixed IDs make reruns safe without resetting later changes.
 INSERT INTO leads (id, plaintiff_id, name, email, category, region, description, status, firm_id, created_at) VALUES
     ('30000000-0000-4000-8000-000000000001', '20000000-0000-4000-8000-000000000001',
      'Maya Patel', 'maya@example.com', 'Employment', 'Ontario',

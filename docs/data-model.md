@@ -50,12 +50,12 @@ These are the logical fields we need for the workflows.
 | Choice | Tradeoff |
 | --- | --- |
 | PostgreSQL | Supports locking one lead during acceptance while other leads can still be updated. It requires a running database service. |
-| Docker Compose for local PostgreSQL | Gives reviewers the same database setup from a fresh checkout. It adds Docker as a prerequisite for the default setup. |
+| Docker Compose for local PostgreSQL | Provides the same database setup from a fresh checkout. It adds Docker as a prerequisite for the default setup. |
 | Separate lead and case records | Preserves the original intake and gives case progress its own lifecycle. Reading both together requires a join. |
 | One current assignment on the lead | Keeps reassignment to one field update. Case queries join the lead when they need the current firm. |
 | Seeded routing by category and region | Gives each pair a predictable destination. Supporting multiple eligible firms would require a selection policy such as priority or round-robin. |
 | Current state with append-only audit events | The app reads current state directly and admins can inspect changes in order. Each workflow action must write its audit event alongside the update. Full snapshots would use more storage, and event sourcing would add event replay and versioning. |
 | Separate plaintiff notices | Keeps plaintiff-facing messages easy to query and gives them a separate access rule from the admin audit history. Each action that requires a notice writes one alongside the audit event. |
-| Idempotency keys for lead, note, and PDF creation | A retry returns the saved result without creating a duplicate. Concurrent requests with the same key wait for the first transaction. Keeping results until the demo database is reset uses storage and avoids a retry window that could expire. |
+| Idempotency keys for lead, note, and PDF creation | A retry returns the saved result without creating a duplicate. Concurrent requests with the same key wait for the first transaction. Keeping results until the database is reset uses storage and avoids a retry window that could expire. |
 
 The [decision log](decisions.md) tracks remaining product questions, including case reopening and routing tie-breaks.

@@ -83,7 +83,7 @@ Attorneys and paralegals have the same firm permissions. **Assigned firm** means
 
 - Plaintiffs can access only their own records. The same rules apply to lists, search results, direct record links, and PDF links.
 - Private notes stay owned by the firm that wrote them. Reassignment changes access to the case and leaves note ownership intact.
-- The new firm automatically gets case details and plaintiff-uploaded PDFs. A PDF shared by a former firm stays available to the plaintiff. The new firm can see a copy if the plaintiff uploads it for them. Requests to a former firm are outside the take-home scope.
+- The new firm automatically gets case details and plaintiff-uploaded PDFs. A PDF shared by a former firm stays available to the plaintiff. The new firm can see a copy if the plaintiff uploads it for them. Requests to a former firm are outside the product scope.
 
 ## Audit history
 

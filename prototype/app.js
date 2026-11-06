@@ -96,13 +96,13 @@ function shell(content) {
       <header class="topbar">
         <div class="breadcrumbs"><span>${escape(roleName(actor))}</span>${icon('chevron-right', 13)}<strong>${current}</strong></div>
         <div class="topbar-actions">
-          <label class="demo-select"><span class="topbar-demo-label">Demo role</span>
-            <select aria-label="Switch demo role" data-role-switch>${actors.map(item => {
+          <label class="demo-select"><span class="topbar-demo-label">Account</span>
+            <select aria-label="Switch account" data-role-switch>${actors.map(item => {
               const label = item.role === 'plaintiff' ? `Plaintiff · ${item.name}` : roleName(item);
               return `<option value="${escape(item.id)}" ${item.id === actor.id ? 'selected' : ''}>${escape(label)}</option>`;
             }).join('')}</select>${icon('chevron-down', 14)}
           </label>
-          <button type="button" class="icon-button" data-action="reset" title="Reset demo" aria-label="Reset demo">${icon('refresh', 17)}</button>
+          <button type="button" class="icon-button" data-action="reset" title="Reset workspace" aria-label="Reset workspace">${icon('refresh', 17)}</button>
         </div>
       </header>
       <div class="content">${content}</div>
@@ -195,11 +195,11 @@ function newRequest() {
         <label class="field">Category<select name="category" required>${option('', 'Select a category')}${categories.map(item => option(item)).join('')}</select></label>
       </div>
       <label class="field">What happened?<textarea name="description" rows="5" required maxlength="2500" placeholder="Briefly describe what happened and what you need help with."></textarea></label>
-      <label class="field">Supporting PDF <span class="form-hint">Optional · Up to 750 KB in this demo</span><input type="file" name="file" accept=".pdf,application/pdf"></label>
+      <label class="field">Supporting PDF <span class="form-hint">Optional · Up to 750 KB</span><input type="file" name="file" accept=".pdf,application/pdf"></label>
       <p class="form-error" role="alert" hidden></p>
       <div class="detail-actions">${button('page', 'Cancel', 'secondary', undefined, 'requests')}<button class="button primary" type="submit">Submit request ${icon('arrow-right', 16)}</button></div>
     </form>
-    <aside class="panel demo-guide"><div class="intake-folio">${folioMark}<span>Grand Charter</span></div><div class="card-heading"><div><h2>Before you submit</h2><p>Include what happened, where it happened, and what help you’re looking for.</p></div></div><div class="notice">${icon('info')}<span>This is a local prototype. Use fictional information and sample PDFs.</span></div></aside>
+    <aside class="panel demo-guide"><div class="intake-folio">${folioMark}<span>Grand Charter</span></div><div class="card-heading"><div><h2>Before you submit</h2><p>Include what happened, where it happened, and what help you’re looking for.</p></div></div></aside>
   </div>`;
 }
 
@@ -427,7 +427,7 @@ function route(page) {
 async function previewFile(index) {
   const file = displayedFiles[index];
   if (!file) return;
-  let body = `<div class="notice">${icon('file')}<span>Sample document for the prototype. Upload a PDF to try the document viewer.</span></div>`;
+  let body = `<div class="notice">${icon('file')}<span>No PDF is attached to this document.</span></div>`;
   if (file.url) {
     const response = await fetch(file.url);
     previewUrl = URL.createObjectURL(await response.blob());
@@ -489,9 +489,9 @@ async function handleAction(action, value) {
     case 'view-file': await previewFile(Number(value)); break;
     case 'reset':
       openDialog({
-        title: 'Reset the demo?', copy: 'Restore sample records and clear changes made in this browser.',
-        label: 'Reset demo', danger: true,
-        submit: () => { reset(); setRequestUrl(null); resetView(); done('Demo reset.'); },
+        title: 'Reset the workspace?', copy: 'Restore initial records and clear changes made in this browser.',
+        label: 'Reset workspace', danger: true,
+        submit: () => { reset(); setRequestUrl(null); resetView(); done('Workspace reset.'); },
       });
       break;
     case 'accept':
@@ -578,7 +578,7 @@ async function handleAction(action, value) {
       openDialog({
         title: 'Upload a PDF',
         copy: actor.role === 'firm' ? 'This PDF will be shared with the plaintiff.' : 'This PDF will be visible to the assigned firm.',
-        body: '<label class="field">PDF file <span class="form-hint">Up to 750 KB in this demo</span><input type="file" name="file" accept=".pdf,application/pdf" required></label>',
+        body: '<label class="field">PDF file <span class="form-hint">Up to 750 KB</span><input type="file" name="file" accept=".pdf,application/pdf" required></label>',
         label: 'Upload PDF',
         submit: async data => {
           const file = await readPdf(data.get('file'));
