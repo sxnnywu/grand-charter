@@ -3,18 +3,21 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { categories, regions } from "@/lib/intake-options";
 import { AdminTools, type Firm } from "./admin-tools";
-import { isAccessError, messageFor, post, request } from "./api-client";
+import { ApiError, isAccessError, messageFor, post, request } from "./api-client";
 import { CaseTools, LeadDocuments } from "./case-tools";
+import { AccountSwitcher, Brand } from "./workspace-chrome";
+import { FirmWorkspace } from "./firm-workspace";
+import { AdminWorkspace } from "./admin-workspace";
 import { DemoAccountGuide } from "./demo-account-guide";
 import { PlaintiffHome } from "./plaintiff-view";
-import { PlaintiffIntake, RequestSubmitted, type IntakeDraft } from "./plaintiff-intake";
+import { PlaintiffIntake, RequestSubmitted, type IntakeDraft, type IntakeFieldErrors } from "./plaintiff-intake";
 import { PlaintiffCaseDetail, PlaintiffLeadDetail, type PlaintiffCaseRecord } from "./plaintiff-records";
 import { animateWorkspace, observeScrollReveals, stopWorkspaceTransition } from "./workspace-motion";
 import "./plaintiff-shell.css";
 
 type Role = "plaintiff" | "attorney" | "paralegal" | "admin";
-type Account = { id: string; name: string; email: string; role: Role; firmName: string | null };
-type User = Omit<Account, "email"> & { firmId: string | null };
+export type Account = { id: string; name: string; email: string; role: Role; firmName: string | null };
+export type User = Omit<Account, "email"> & { firmId: string | null };
 type Session = { user: User | null; accounts: Account[] };
 type LeadStatus = "pending_assignment" | "awaiting_firm_review" | "accepted" | "declined" | "closed";
 type CaseStatus = "open" | "in_progress" | "closed";
@@ -57,7 +60,7 @@ const statuses: Record<LeadStatus | CaseStatus, [string, string]> = {
   awaiting_firm_review: ["Awaiting firm review", "review"],
   accepted: ["Accepted", "accepted"],
   declined: ["Declined", "declined"],
-  open: ["Open", "open"],
+  open: ["New case", "open"],
   in_progress: ["In progress", "progress"],
   closed: ["Closed", "closed"],
 };
@@ -83,10 +86,6 @@ function Icon({ name, size = 18 }: { name: keyof typeof glyphs; size?: number })
       <path d={glyphs[name]} />
     </svg>
   );
-}
-
-function Brand() {
-  return <div className="brand"><span className="brand-mark"><Icon name="folio" size={23} /></span>Brief</div>;
 }
 
 function Badge({ status, label }: { status: LeadStatus | CaseStatus; label?: string }) {
@@ -121,6 +120,7 @@ function writeRecordUrl(leadId?: string, caseId?: string, replace = false) {
   const url = new URL(window.location.href);
   url.searchParams.delete("lead");
   url.searchParams.delete("case");
+  for (const name of ["view", "leadStatus", "caseStatus", "status", "firmId", "sort", "region", "category", "q", "layout"]) url.searchParams.delete(name);
   if (leadId) url.searchParams.set("lead", leadId);
   if (caseId) url.searchParams.set("case", caseId);
   if (url.href === window.location.href) return;
@@ -155,7 +155,7 @@ export function Workspace() {
   useEffect(() => {
     const controller = new AbortController();
     request<Session>("/api/session", { signal: controller.signal })
-      .then(setSession)
+      .then((current) => { if (!controller.signal.aborted) setSession(current); })
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setSessionError(messageFor(error));
       });
@@ -173,12 +173,13 @@ export function Workspace() {
         email,
         password: "grand-charter-demo",
       });
-      if (action === "switch") {
-        writeRecordUrl(undefined, undefined, true);
+      await animateWorkspace("session", () => {
+        if (action === "switch") writeRecordUrl(undefined, undefined, true);
         window.scrollTo(0, 0);
-      }
-      setSession((current) => current && { ...current, user });
-      setDemoEmail("");
+        setSession((current) => current && { ...current, user });
+        setDemoEmail("");
+        setEntrySettled(true);
+      });
     } catch (error) {
       setSessionError(messageFor(error));
     } finally {
@@ -208,8 +209,12 @@ export function Workspace() {
     setSessionAction("sign-out");
     try {
       await request("/api/session", { method: "DELETE" });
-      writeRecordUrl(undefined, undefined, true);
-      setSession((current) => current && { ...current, user: null });
+      await animateWorkspace("session", () => {
+        writeRecordUrl(undefined, undefined, true);
+        window.scrollTo(0, 0);
+        setSession((current) => current && { ...current, user: null });
+        setEntrySettled(true);
+      });
     } catch (error) {
       setSessionError(messageFor(error));
     } finally {
@@ -218,14 +223,38 @@ export function Workspace() {
     }
   }
 
+  if (!session) {
+    return <main className="workspace-bootstrap" aria-busy={!sessionError}>
+      <Brand />
+      {sessionError ? <div className="workspace-bootstrap-error" role="alert">
+        <p>{sessionError}</p>
+        <button className="button" type="button" onClick={() => {
+          setSessionError("");
+          setSessionAttempt((attempt) => attempt + 1);
+        }}>Try again</button>
+      </div> : <p role="status">Loading workspace…</p>}
+    </main>;
+  }
+
   if (session?.user) {
     const email = session.accounts.find((account) => account.id === session.user?.id)?.email ?? "";
-    return <Portal key={`${session.user.id}:${session.user.role}:${session.user.firmId}`} user={session.user} email={email} signOut={signOut}
+    if (session.user.role === "attorney" || session.user.role === "paralegal") {
+      return <div className="workspace-session" inert={!!sessionAction} aria-busy={!!sessionAction}><FirmWorkspace key={`${session.user.id}:${session.user.firmId}`} user={session.user}
+        accounts={session.accounts} switchAccount={(email) => { void startSession(email, "switch"); }} signOut={signOut}
+        sessionAction={sessionAction === "sign-in" ? null : sessionAction} sessionError={sessionError} verifySession={verifySession} /></div>;
+    }
+    if (session.user.role === "admin") {
+      return <div className="workspace-session" inert={!!sessionAction} aria-busy={!!sessionAction}><AdminWorkspace key={session.user.id} user={session.user}
+        accounts={session.accounts} switchAccount={(email) => { void startSession(email, "switch"); }} signOut={signOut}
+        sessionAction={sessionAction === "sign-in" ? null : sessionAction} sessionError={sessionError} verifySession={verifySession} /></div>;
+    }
+    return <div className="workspace-session" inert={!!sessionAction} aria-busy={!!sessionAction}><Portal key={`${session.user.id}:${session.user.role}:${session.user.firmId}`} user={session.user} email={email} signOut={signOut}
       accounts={session.accounts} switchAccount={(email) => startSession(email, "switch")}
-      sessionAction={sessionAction === "sign-in" ? null : sessionAction} sessionError={sessionError} verifySession={verifySession} />;
+      sessionAction={sessionAction === "sign-in" ? null : sessionAction} sessionError={sessionError} verifySession={verifySession} /></div>;
   }
 
   return (
+    <div className="workspace-session" inert={!!sessionAction} aria-busy={!!sessionAction}>
     <main className="demo-entry" data-settled={entrySettled || undefined}
       onFocusCapture={(event) => {
         if (event.target.matches(":focus-visible")) setEntrySettled(true);
@@ -260,82 +289,13 @@ export function Workspace() {
               }} />
           </div>
           <button className="button primary" disabled={!!sessionAction || (!session && !sessionError) || session?.accounts.length === 0} type="submit">
-            {!session && sessionError ? "Try again" : sessionAction ? "Signing in…" : "Sign in"} <Icon name="arrow" size={16} />
+            {!session && sessionError ? "Try again" : sessionAction === "sign-in" ? "Signing in…" : "Sign in"} <Icon name="arrow" size={16} />
           </button>
         </form>
         <p className="demo-notice">Use fictional information in this demo.</p>
       </section>
     </main>
-  );
-}
-
-const accountGroups: { title: string; roles: Role[] }[] = [
-  { title: "Plaintiffs", roles: ["plaintiff"] },
-  { title: "Firm staff", roles: ["attorney", "paralegal"] },
-  { title: "Admin", roles: ["admin"] },
-];
-
-function AccountSwitcher({ user, accounts, disabled, switching, onSwitch }: {
-  user: User; accounts: Account[]; disabled: boolean; switching: boolean; onSwitch: (email: string) => void;
-}) {
-  const disclosure = useRef<HTMLDetailsElement>(null);
-  const trigger = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    function closeOnOutsideClick(event: PointerEvent) {
-      const menu = disclosure.current;
-      if (menu?.open && !menu.contains(event.target as Node)) menu.open = false;
-    }
-    document.addEventListener("pointerdown", closeOnOutsideClick);
-    return () => document.removeEventListener("pointerdown", closeOnOutsideClick);
-  }, []);
-
-  function closeAndFocus() {
-    if (disclosure.current) disclosure.current.open = false;
-    trigger.current?.focus();
-  }
-
-  return (
-    <details className="account-switcher" ref={disclosure}
-      onBlur={(event) => {
-        if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && event.currentTarget.open) {
-          event.preventDefault();
-          closeAndFocus();
-        }
-      }}>
-      <summary className="button small account-trigger" ref={trigger} aria-disabled={disabled || undefined}
-        aria-label={switching ? "Switching account" : `Switch account, currently ${user.name}`}
-        onClick={(event) => { if (disabled) event.preventDefault(); }}>
-        <span className="account-avatar" aria-hidden="true">{initials(user.name)}</span>
-        <span>{switching ? "Switching…" : "Switch account"}</span>
-        <Icon name="down" size={14} />
-      </summary>
-      <div className="account-menu" aria-label="Demo accounts">
-        {accountGroups.map(({ title, roles }) => {
-          const group = accounts.filter((account) => roles.includes(account.role));
-          return group.length > 0 && <div className="account-group" key={title}>
-            <h2>{title}</h2>
-            {group.map((account) => {
-              const current = account.id === user.id;
-              return (
-                <button className="account-option" type="button" key={account.id} aria-current={current || undefined}
-                  disabled={disabled || current} onClick={() => { closeAndFocus(); onSwitch(account.email); }}>
-                  <span className="account-avatar" aria-hidden="true">{initials(account.name)}</span>
-                  <span className="account-option-copy">
-                    <strong>{account.name}</strong>
-                    {account.firmName && <small>{account.role === "paralegal" ? "Paralegal" : "Attorney"} · {account.firmName}</small>}
-                  </span>
-                  {current && <Icon name="check" size={16} />}
-                </button>
-              );
-            })}
-          </div>;
-        })}
-      </div>
-    </details>
+    </div>
   );
 }
 
@@ -349,6 +309,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const home = isPlaintiff ? "My requests" : isAdmin ? "Lead queue" : "Lead inbox";
   const [composing, setComposing] = useState(false);
   const [intakeDraft, setIntakeDraft] = useState<IntakeDraft>({ name: user.name, email, region: "", category: "", description: "" });
+  const [intakeFieldErrors, setIntakeFieldErrors] = useState<IntakeFieldErrors>({});
   const hasIntakeDraft = isPlaintiff && (intakeDraft.name.trim() !== user.name.trim() || intakeDraft.email.trim() !== email.trim()
     || !!intakeDraft.region || !!intakeDraft.category || !!intakeDraft.description.trim());
   const leaveDraftDialog = useRef<HTMLDialogElement>(null);
@@ -429,10 +390,12 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   function resetIntakeDraft() {
     setIntakeDraft({ name: user.name, email, region: "", category: "", description: "" });
     intakeAttempt.current = null;
+    setIntakeFieldErrors({});
   }
 
   const onAccessLost = useCallback(() => {
     if (selectedRef.current !== selectedId) return;
+    initialRequestChecked.current = true;
     stopWorkspaceTransition();
     setSelectedId(undefined);
     setCaseId(undefined);
@@ -672,6 +635,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     const submittedAtHistory = historyRevision.current;
     const form = new FormData(event.currentTarget);
     setActionError("");
+    setIntakeFieldErrors({});
     setAction("submit");
     try {
       const input = Object.fromEntries(["name", "email", "region", "category", "description"]
@@ -699,6 +663,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       setSubmitted(created);
     } catch (error) {
       setActionError(messageFor(error));
+      if (error instanceof ApiError && error.fieldErrors) setIntakeFieldErrors(error.fieldErrors);
     } finally {
       mutationBusy.current = false;
       setAction(undefined);
@@ -764,7 +729,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
 
   const record = selectedId ? (
     caseId && lead?.caseId === caseId ? (
-      isPlaintiff ? <PlaintiffCaseDetail key={caseId} id={caseId} lead={lead} back={() => selectCase()}
+      isPlaintiff ? <PlaintiffCaseDetail key={caseId} id={caseId} lead={lead} back={() => select()}
         locked={acting} onBusyChange={setChildBusy} onAccessLost={onAccessLost} onLoaded={updatePlaintiffCase}
         refreshVersion={refreshVersion} /> :
       <CaseDetail key={caseId} id={caseId} lead={lead} back={() => selectCase()} role={user.role}
@@ -856,7 +821,12 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
                 window.scrollTo(0, 0);
               })} />
             ) : composing ? (
-              <PlaintiffIntake draft={intakeDraft} hasDraft={hasIntakeDraft} updateDraft={setIntakeDraft}
+              <PlaintiffIntake draft={intakeDraft} hasDraft={hasIntakeDraft} updateDraft={(next) => {
+                setIntakeDraft(next);
+                setIntakeFieldErrors((current) => Object.fromEntries(Object.entries(current)
+                  .filter(([field]) => next[field as keyof IntakeDraft] === intakeDraft[field as keyof IntakeDraft])));
+                setActionError("");
+              }} fieldErrors={intakeFieldErrors}
                 discardDraft={() => {
                   resetIntakeDraft();
                   showIntake(false);

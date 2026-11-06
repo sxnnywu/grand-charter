@@ -35,7 +35,7 @@ export function plaintiffStatus(lead: Lead): Status {
       label: "In progress", tone: "active", message: `${firm} is working on your case.`,
     };
     return {
-      label: "Case opened", tone: "active",
+      label: "New case", tone: "active",
       message: `${firm} accepted your request and opened a case.`,
     };
   }
@@ -59,6 +59,14 @@ export function plaintiffStatus(lead: Lead): Status {
 }
 
 const dateFormat = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium" });
+const updateFormat = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium", timeStyle: "short" });
+
+export function latestPlaintiffNotice(lead: Lead) {
+  return [lead.latestNotice, ...(lead.notices ?? [])].reduce<NonNullable<Lead["latestNotice"]> | undefined>((latest, notice) => {
+    if (!notice || !Number.isFinite(Date.parse(notice.createdAt))) return latest;
+    return !latest || Date.parse(notice.createdAt) > Date.parse(latest.createdAt) ? notice : latest;
+  }, undefined);
+}
 
 function DocumentIcon({ size = 20 }: { size?: number }) {
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -106,30 +114,30 @@ function StartingPoint({ firstName, onStart, locked, hasDraft = false }: {
 function RequestOverview({ leads, onSelect, locked }: {
   leads: Lead[]; onSelect: (id: string, caseId?: string) => void; locked: boolean;
 }) {
-  const featured = leads.find((lead) => lead.caseId && lead.caseStatus !== "closed")
+  const recent = leads.reduce<{ lead: Lead; notice: NonNullable<Lead["latestNotice"]> } | undefined>((latest, lead) => {
+    const notice = latestPlaintiffNotice(lead);
+    return notice && (!latest || Date.parse(notice.createdAt) > Date.parse(latest.notice.createdAt)) ? { lead, notice } : latest;
+  }, undefined);
+  const featured = recent?.lead ?? leads.find((lead) => lead.caseId && lead.caseStatus !== "closed")
     ?? leads.find((lead) => lead.status !== "closed" && lead.caseStatus !== "closed") ?? leads[0];
   if (!featured) return null;
   const status = plaintiffStatus(featured);
   return <section className="plaintiff-home-overview motion-enter motion-detail" aria-labelledby="plaintiff-overview-heading">
     <div className="plaintiff-home-overview-heading">
-      <span className="plaintiff-home-section-label">Where things stand</span>
+      <span className="plaintiff-home-section-label">{recent ? "Latest update" : "Where things stand"}</span>
       <StatusBadge lead={featured} />
     </div>
     <h2 id="plaintiff-overview-heading">{plaintiffRequestTitle(featured)}</h2>
-    <p className="plaintiff-home-overview-meta">{featured.category} · {featured.region} · Submitted <time dateTime={featured.createdAt}>{dateFormat.format(new Date(featured.createdAt))}</time></p>
-    <p className="plaintiff-home-overview-message">{status.message}</p>
-    {!featured.caseId && featured.status !== "closed" && <p className="plaintiff-home-overview-next-step">
-      You don’t need to do anything right now. Supporting PDFs are optional.
+    <p className="plaintiff-home-overview-meta">{featured.category} · {featured.region}{!recent && <> · Submitted <time dateTime={featured.createdAt}>{dateFormat.format(new Date(featured.createdAt))}</time></>}</p>
+    {recent && <time className="plaintiff-home-update-date" dateTime={recent.notice.createdAt}>{updateFormat.format(new Date(recent.notice.createdAt))}</time>}
+    <p className="plaintiff-home-overview-message">{recent?.notice.message ?? status.message}</p>
+    {!recent && !featured.caseId && featured.status !== "closed" && <p className="plaintiff-home-overview-next-step">
+      You don’t need to do anything right now.
     </p>}
     <button className="button primary" type="button" disabled={locked}
       onClick={() => onSelect(featured.id, featured.caseId ?? undefined)}>
       {featured.caseId ? featured.caseStatus === "closed" ? "View case details" : "View case progress" : "View request"} <Arrow />
     </button>
-    {featured.latestNotice && <div className="plaintiff-home-notice">
-      <span>Update on <time dateTime={featured.latestNotice.createdAt}>{dateFormat.format(new Date(featured.latestNotice.createdAt))}</time></span>
-      <p>{featured.latestNotice.message}</p>
-    </div>}
-    <p className="plaintiff-home-overview-hint">Open any request from your list to see its details and documents.</p>
   </section>;
 }
 

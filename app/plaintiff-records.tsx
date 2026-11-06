@@ -60,7 +60,9 @@ function RecordStatus({ lead }: { lead: Lead }) {
 }
 
 function AssignmentUpdates({ lead }: { lead: Lead }) {
-  const notices = lead.notices?.length ? lead.notices : lead.latestNotice ? [lead.latestNotice] : [];
+  const notices = (lead.notices?.length ? [...lead.notices] : lead.latestNotice ? [lead.latestNotice] : [])
+    .filter((notice) => Number.isFinite(Date.parse(notice.createdAt)))
+    .sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt));
   if (!notices.length) return null;
   const [latest, ...earlier] = notices;
   return <section className="plaintiff-record-updates" aria-label="Assignment updates">
@@ -107,7 +109,7 @@ export function PlaintiffLeadDetail({ lead, close, openCase, locked, onBusyChang
 
   return <article className="plaintiff-record motion-enter motion-detail">
     <header className="plaintiff-record-header">
-      <button className="subtle-link" type="button" disabled={locked} onClick={close}><Arrow back />All requests</button>
+      <button className="subtle-link" type="button" disabled={locked} onClick={close}><Arrow back />My requests</button>
       <div className="plaintiff-record-heading">
         <h2 className="record-heading" tabIndex={-1} ref={focusHeading}>{plaintiffRequestTitle(lead)}</h2>
         <p>{lead.category} · {lead.region} · Submitted {dateFormat.format(new Date(lead.createdAt))}</p>
@@ -171,17 +173,18 @@ export function PlaintiffCaseDetail({ id, lead, back, locked, onBusyChange, onAc
 
   return <article className="plaintiff-record plaintiff-case motion-enter motion-detail">
     <header className="plaintiff-record-header">
-      <button className="subtle-link" type="button" disabled={locked} onClick={back}><Arrow back />Back to request</button>
+      <button className="subtle-link" type="button" disabled={locked} onClick={back}><Arrow back />My requests</button>
       <div className="plaintiff-record-heading">
-        <p className="plaintiff-case-label">Your case</p>
         <h2 className="record-heading" tabIndex={-1} ref={focusHeading}>{plaintiffRequestTitle(lead)}</h2>
         <p>{lead.category} · {lead.region} · Submitted {dateFormat.format(new Date(lead.createdAt))}</p>
       </div>
       {item && <div className="plaintiff-case-summary">
-        <RecordStatus lead={currentLead} />
-        <p className="plaintiff-case-firm"><span>Law firm</span><strong>{currentLead.firmName ?? "No firm assigned"}</strong></p>
+        <div className="plaintiff-case-status-heading">
+          <RecordStatus lead={currentLead} />
+          <span className="plaintiff-case-firm">{currentLead.firmName ?? "No firm assigned"}</span>
+        </div>
         <p className="plaintiff-case-message">{status.message}</p>
-        <button className="button" type="button" disabled={locked} onClick={() => showDocuments(tools, item.id)}>View documents <Arrow /></button>
+        <button className="subtle-link plaintiff-case-documents" type="button" disabled={locked} onClick={() => showDocuments(tools, item.id)}>View documents <Arrow /></button>
       </div>}
     </header>
     <div className="plaintiff-record-body">

@@ -289,39 +289,19 @@
   overflow-wrap: anywhere;
 }
 
+.plaintiff-home-update-date {
+  display: block;
+  margin: -7px 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .plaintiff-home-overview-next-step {
   margin-top: -8px;
   margin-bottom: 22px;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.65;
-}
-
-.plaintiff-home-notice {
-  margin-top: 26px;
-  padding: 16px 18px;
-  border-left: 2px solid var(--indigo);
-  background: #f0f2f8;
-}
-
-.plaintiff-home-notice > span {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.plaintiff-home-notice p {
-  margin-top: 4px;
-  font-size: 13px;
-  line-height: 1.65;
-  overflow-wrap: anywhere;
-}
-
-.plaintiff-home-overview-hint {
-  margin-top: 28px;
-  padding-top: 18px;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
-  font-size: 12px;
 }
 
 @media (max-width: 920px) {
@@ -374,7 +354,7 @@
   .plaintiff-home-view .bookshelf:not(.has-selection) {
     display: flex;
     flex-direction: column;
-    gap: 30px;
+    gap: 20px;
   }
 
   .plaintiff-home-view .bookshelf:not(.has-selection) .bookshelf-reading {
@@ -394,6 +374,43 @@
   }
 
   .plaintiff-home-overview {
-    padding: 25px;
+    padding: 18px;
+  }
+
+  .plaintiff-home-overview-heading {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .plaintiff-home-overview h2 {
+    margin-bottom: 8px;
+    font-size: 23px;
+    line-height: 1.2;
+    -webkit-line-clamp: 2;
+  }
+
+  .plaintiff-home-overview-meta {
+    margin-bottom: 10px;
+    font-size: 11px;
+  }
+
+  .plaintiff-home-overview-message {
+    margin-bottom: 13px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .plaintiff-home-overview-next-step {
+    margin: -4px 0 13px;
+  }
+
+  .plaintiff-home-update-date {
+    margin-top: -4px;
+  }
+
+  .plaintiff-home-overview > .button {
+    min-height: 36px;
+    padding: 8px 11px;
+    font-size: 12px;
   }
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { categories, regions } from "@/lib/intake-options";
 import "./plaintiff-intake.css";
 
@@ -11,6 +11,31 @@ export type IntakeDraft = {
   category: string;
   description: string;
 };
+export type IntakeFieldErrors = Partial<Record<keyof IntakeDraft, string>>;
+
+const intakeFields = ["name", "email", "region", "category", "description"] as const;
+const categoryExamples: Record<string, string> = {
+  Employment: "work, pay, or dismissal",
+  Housing: "renting or a landlord",
+  "Personal injury": "an accident or injury",
+  "Contract dispute": "a disagreement about an agreement",
+};
+
+function validateIntake(form: HTMLFormElement): IntakeFieldErrors {
+  const values = new FormData(form);
+  const value = (name: keyof IntakeDraft) => String(values.get(name) ?? "").trim();
+  const errors: IntakeFieldErrors = {};
+  if (!value("name")) errors.name = "Enter your full name.";
+  else if (value("name").length > 100) errors.name = "Use 100 characters or fewer for your name.";
+  const email = form.elements.namedItem("email") as HTMLInputElement;
+  if (!value("email")) errors.email = "Enter your email address.";
+  else if (email.validity.typeMismatch || value("email").length > 180) errors.email = "Enter a valid email address.";
+  if (!regions.includes(value("region"))) errors.region = "Choose a province.";
+  if (!categories.includes(value("category"))) errors.category = "Choose the closest type of legal help.";
+  if (!value("description")) errors.description = "Describe what happened and what you need help with.";
+  else if (value("description").length > 2500) errors.description = "Use 2,500 characters or fewer.";
+  return errors;
+}
 
 type IntakeProps = {
   draft: IntakeDraft;
@@ -21,6 +46,7 @@ type IntakeProps = {
   cancel: () => void;
   submitting: boolean;
   error: string;
+  fieldErrors?: IntakeFieldErrors;
 };
 
 export type SubmittedRequestSummary = {
@@ -40,8 +66,38 @@ function focusHeading(heading: HTMLHeadingElement | null) {
   heading?.focus({ preventScroll: true });
 }
 
-export function PlaintiffIntake({ draft, hasDraft, updateDraft, discardDraft, submit, cancel, submitting, error }: IntakeProps) {
+export function PlaintiffIntake({ draft, hasDraft, updateDraft, discardDraft, submit, cancel, submitting, error, fieldErrors }: IntakeProps) {
   const discardDialog = useRef<HTMLDialogElement>(null);
+  const form = useRef<HTMLFormElement>(null);
+  const errorSummary = useRef<HTMLDivElement>(null);
+  const [clientErrors, setClientErrors] = useState<IntakeFieldErrors>({});
+  const errors = { ...fieldErrors, ...clientErrors };
+  const hasFieldErrors = intakeFields.some((field) => !!errors[field]);
+
+  function focusFirstError(nextErrors: IntakeFieldErrors) {
+    const name = intakeFields.find((field) => nextErrors[field]);
+    const control = name && form.current?.elements.namedItem(name);
+    if (control instanceof HTMLElement) control.focus();
+  }
+
+  useEffect(() => {
+    if (submitting || !error) return;
+    if (fieldErrors && intakeFields.some((field) => fieldErrors[field])) focusFirstError(fieldErrors);
+    else errorSummary.current?.focus();
+  }, [error, fieldErrors, submitting]);
+
+  function fieldProps(field: keyof IntakeDraft, helpId?: string) {
+    return {
+      id: `plaintiff-intake-${field}`,
+      "aria-invalid": errors[field] ? true as const : undefined,
+      "aria-describedby": [helpId, errors[field] ? `plaintiff-intake-${field}-error` : undefined].filter(Boolean).join(" ") || undefined,
+    };
+  }
+
+  function fieldError(field: keyof IntakeDraft) {
+    return errors[field] ? <small className="plaintiff-intake-field-error" id={`plaintiff-intake-${field}-error`}>{errors[field]}</small> : null;
+  }
+
   return <div className="plaintiff-intake">
     <button className="subtle-link plaintiff-intake-back" type="button" onClick={cancel} disabled={submitting}>
       <Arrow back />My requests
@@ -51,49 +107,78 @@ export function PlaintiffIntake({ draft, hasDraft, updateDraft, discardDraft, su
       <p>Describe your situation so a law firm can review your request.</p>
     </header>
     <div className="plaintiff-intake-layout">
-      <form className="panel plaintiff-intake-form" aria-label="Request details" onSubmit={submit}
+      <form className="panel plaintiff-intake-form" ref={form} aria-label="Request details" noValidate onSubmit={(event) => {
+          event.preventDefault();
+          const nextErrors = validateIntake(event.currentTarget);
+          setClientErrors(nextErrors);
+          if (intakeFields.some((field) => nextErrors[field])) {
+            requestAnimationFrame(() => focusFirstError(nextErrors));
+            return;
+          }
+          submit(event);
+        }}
         onChange={(event) => {
           const fields = new FormData(event.currentTarget);
-          updateDraft(Object.fromEntries(["name", "email", "region", "category", "description"]
+          updateDraft(Object.fromEntries(intakeFields
             .map((field) => [field, String(fields.get(field) ?? "")])) as IntakeDraft);
+          const target = event.target;
+          if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) return;
+          const name = target.name as keyof IntakeDraft;
+          setClientErrors((current) => {
+            if (!current[name]) return current;
+            const next = { ...current };
+            delete next[name];
+            return next;
+          });
         }}
-        aria-busy={submitting} aria-describedby={error ? "plaintiff-intake-error" : undefined}>
+        aria-busy={submitting} aria-describedby={error || hasFieldErrors ? "plaintiff-intake-error" : undefined}>
         <p className="plaintiff-intake-required">All fields are required.</p>
+        {(error || hasFieldErrors) && <div className="workspace-message workspace-error" id="plaintiff-intake-error" role="alert" tabIndex={-1} ref={errorSummary}>
+          {hasFieldErrors ? "Check the highlighted details below." : error}
+        </div>}
         <fieldset className="plaintiff-intake-group" disabled={submitting}>
           <legend>About you</legend>
           <div className="plaintiff-intake-fields">
-            <label className="field">Full name
-              <input name="name" autoComplete="name" defaultValue={draft.name} required maxLength={100} />
-            </label>
-            <label className="field">Email address
-              <input type="email" name="email" autoComplete="email" defaultValue={draft.email} required maxLength={180} />
-            </label>
+            <div className="field"><label htmlFor="plaintiff-intake-name">Full name</label>
+              <input {...fieldProps("name")} name="name" autoComplete="name" defaultValue={draft.name} required maxLength={100} />
+              {fieldError("name")}
+            </div>
+            <div className="field"><label htmlFor="plaintiff-intake-email">Email address</label>
+              <input {...fieldProps("email")} type="email" name="email" autoComplete="email" defaultValue={draft.email} required maxLength={180} />
+              {fieldError("email")}
+            </div>
           </div>
         </fieldset>
         <fieldset className="plaintiff-intake-group" disabled={submitting}>
           <legend>About your request</legend>
           <div className="plaintiff-intake-fields">
-            <label className="field">Province
-              <select name="region" required defaultValue={draft.region}>
+            <div className="field"><label htmlFor="plaintiff-intake-region">Province</label>
+              <select {...fieldProps("region", "plaintiff-intake-region-help")} name="region" required defaultValue={draft.region}>
                 <option value="" disabled>Select a province</option>
                 {regions.map((region) => <option key={region}>{region}</option>)}
               </select>
-            </label>
-            <label className="field">Type of legal help
-              <select name="category" required defaultValue={draft.category} aria-describedby="plaintiff-intake-category-help">
+              <small id="plaintiff-intake-region-help">Choose the province where your situation took place.</small>
+              {fieldError("region")}
+            </div>
+            <div className="field"><label htmlFor="plaintiff-intake-category">Type of legal help</label>
+              <select {...fieldProps("category", "plaintiff-intake-category-help")} name="category" required defaultValue={draft.category}>
                 <option value="" disabled>Select a type</option>
-                {categories.map((category) => <option key={category}>{category}</option>)}
+                {categories.map((category) => <option key={category} value={category}>{category} - {categoryExamples[category]}</option>)}
               </select>
               <small id="plaintiff-intake-category-help">Choose the closest fit for your situation.</small>
-            </label>
+              {fieldError("category")}
+            </div>
           </div>
-          <label className="field plaintiff-intake-description">What happened?
-            <textarea name="description" rows={5} required maxLength={2500} defaultValue={draft.description}
+          <div className="field plaintiff-intake-description"><label htmlFor="plaintiff-intake-description">What happened?</label>
+            <textarea {...fieldProps("description", "plaintiff-intake-description-count")} name="description" rows={5} required maxLength={2500} defaultValue={draft.description}
               placeholder="Describe what happened and what you would like help with." />
-          </label>
+            <div className="plaintiff-intake-description-feedback">
+              {fieldError("description")}
+              <span className="plaintiff-intake-character-count" id="plaintiff-intake-description-count">{draft.description.length.toLocaleString("en-CA")} / 2,500 characters</span>
+            </div>
+          </div>
         </fieldset>
         <p className="plaintiff-intake-draft-hint">You can switch views and return to finish this request. Nothing is sent until you submit.</p>
-        {error && <p className="workspace-message workspace-error" id="plaintiff-intake-error" role="alert">{error}</p>}
         <div className="plaintiff-intake-actions">
           <button className="subtle-link" type="button" onClick={() => discardDialog.current?.showModal()}
             disabled={submitting || !hasDraft}>Discard draft</button>

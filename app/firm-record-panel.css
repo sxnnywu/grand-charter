@@ -1,0 +1,150 @@
+.firm-record-panel,
+.firm-record-panel-content {
+  min-width: 0;
+}
+
+.firm-record-panel-chrome[hidden] {
+  display: none;
+}
+
+.firm-record-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #25293645;
+  cursor: default;
+}
+
+.firm-record-panel.is-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 81;
+  width: min(650px, calc(100vw - 32px));
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  border-left: 1px solid var(--line);
+  border-radius: 14px 0 0 14px;
+  background: var(--paper);
+  box-shadow: -12px 0 48px #1b223629;
+}
+
+.firm-record-panel.is-drawer:focus {
+  outline: none;
+}
+
+.firm-record-panel-chrome {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 59px;
+  padding: 10px 19px 10px 26px;
+  border-bottom: 1px solid var(--line);
+  background: var(--canvas);
+}
+
+.firm-record-panel-identity {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+  min-width: 0;
+}
+
+.firm-record-panel-identity:focus {
+  outline: none;
+}
+
+.firm-record-panel-identity h2 {
+  font: 500 24px/1.15 var(--display-font);
+  letter-spacing: -.025em;
+  overflow-wrap: anywhere;
+}
+
+.firm-record-panel-identity > p {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.firm-record-panel-actions,
+.firm-record-panel-navigation {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.firm-record-panel-navigation .button {
+  min-height: 35px;
+  margin: 0;
+}
+
+.firm-record-panel-close {
+  display: grid;
+  width: 35px;
+  height: 35px;
+  flex-shrink: 0;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+.firm-record-panel-close:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
+}
+
+.firm-record-panel.is-drawer > .firm-record-panel-content > .firm-record {
+  border: 0;
+  border-radius: 0;
+}
+
+@media (max-width: 760px) {
+  .firm-record-panel.is-drawer {
+    inset: 0;
+    width: 100%;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .firm-record-panel-chrome {
+    gap: 10px;
+    padding: max(12px, env(safe-area-inset-top)) 15px 12px 20px;
+  }
+
+  .firm-record-panel-identity h2 {
+    font-size: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .firm-record-panel:not(.is-drawer) > .firm-record-panel-content > .firm-record {
+    animation: workspace-enter 190ms ease-out;
+  }
+
+  .firm-record-panel-close {
+    transition: background-color 150ms ease, border-color 150ms ease;
+  }
+}
+
+@media (hover: hover) {
+  .firm-record-panel-close:hover:not(:disabled) {
+    border-color: #9ba6c5;
+    background: var(--indigo-pale);
+  }
+}

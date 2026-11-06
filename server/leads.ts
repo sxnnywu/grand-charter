@@ -1,5 +1,5 @@
 import { categories, regions } from "@/lib/intake-options";
-import type { PoolClient } from "pg";
+import type { PoolClient, QueryResultRow } from "pg";
 import { db, transaction } from "./db";
 import { isUuid, RequestError } from "./http";
 import { idempotent, requestHash } from "./idempotency";
@@ -34,8 +34,15 @@ async function listRecords(user: User, params: URLSearchParams, casesOnly: boole
   const clauses = [scope.clause];
   const values: (string | null)[] = [...scope.values];
   const parameter = (value: string) => `$${values.push(value)}`;
+  const oldest = params.get("sort") === "oldest";
+  const direction = oldest ? "ASC" : "DESC";
 
   if (casesOnly) clauses.push("c.id IS NOT NULL");
+  if (params.get("attention") === "true") {
+    if (user.role !== "admin") throw new RequestError(403, "Only admins can open the attention queue.");
+    if (casesOnly) throw new RequestError(400, "The attention filter is only available for leads.");
+    clauses.push("l.status IN ('pending_assignment', 'declined')");
+  }
   const status = params.get("status");
   const region = params.get("region");
   const category = params.get("category");
@@ -43,12 +50,7 @@ async function listRecords(user: User, params: URLSearchParams, casesOnly: boole
   if (status) clauses.push(`${casesOnly ? "c" : "l"}.status = ${parameter(status)}`);
   if (region) clauses.push(`l.region = ${parameter(region)}`);
   if (category) clauses.push(`l.category = ${parameter(category)}`);
-  if (before) {
-    if (!isUuid(before)) throw new RequestError(400, "Invalid page cursor.");
-    clauses.push(`(l.created_at, l.id) < (
-      SELECT p.created_at, p.id FROM leads p WHERE ${visibleLeads(user, "p").clause} AND p.id = ${parameter(before)}
-    )`);
-  }
+  if (before && !isUuid(before)) throw new RequestError(400, "Invalid page cursor.");
 
   if (user.role === "admin") {
     const firm = params.get("firmId") ?? undefined;
@@ -56,17 +58,25 @@ async function listRecords(user: User, params: URLSearchParams, casesOnly: boole
       if (!isUuid(firm)) throw new RequestError(400, "Invalid firm.");
       clauses.push(`l.firm_id = ${parameter(firm)}`);
     }
+  }
+
+  if (user.role !== "plaintiff") {
     const query = params.get("q")?.trim().slice(0, 120);
     if (query) {
       const namePattern = `%${query.replace(/[\\%_]/g, "\\$&")}%`;
       if (isUuid(query)) {
         const id = parameter(query);
-        clauses.push(casesOnly ? `c.id = ${id}` : `(l.id = ${id} OR c.id = ${id})`);
+        clauses.push(casesOnly && user.role === "admin" ? `c.id = ${id}` : `(l.id = ${id} OR c.id = ${id})`);
       } else {
         clauses.push(`l.name ILIKE ${parameter(namePattern)}`);
       }
     }
   }
+
+  const matchingWhere = clauses.join(" AND ");
+  if (before) clauses.push(`(l.created_at, l.id) ${oldest ? ">" : "<"} (
+    SELECT p.created_at, p.id FROM leads p WHERE ${visibleLeads(user, "p").clause} AND p.id = ${parameter(before)}
+  )`);
 
   const details = user.role === "plaintiff" ? `
     SELECT ${leadColumns}, (
@@ -74,13 +84,31 @@ async function listRecords(user: User, params: URLSearchParams, casesOnly: boole
       FROM plaintiff_notices n WHERE n.lead_id = l.id
       ORDER BY n.created_at DESC, n.id DESC LIMIT 1
     ) AS "latestNotice" ${leadRelations}` : leadDetails;
-  const { rows } = await db().query(
-    `${details} WHERE ${clauses.join(" AND ")}
-     ORDER BY l.created_at DESC, l.id DESC LIMIT ${pageSize + 1}`,
-    values,
-  );
+  const pageQuery = `${details} WHERE ${clauses.join(" AND ")}
+    ORDER BY l.created_at ${direction}, l.id ${direction} LIMIT ${pageSize + 1}`;
+  let rows: QueryResultRow[];
+  let totalCount: number | undefined;
+  if (params.get("count") === "true") {
+    // Aggregating the page preserves the full count even when the cursor returns no rows.
+    const { rows: [counted] } = await db().query(
+      `SELECT (
+         SELECT COUNT(*) FROM leads l ${casesOnly ? "JOIN" : "LEFT JOIN"} cases c ON c.lead_id = l.id WHERE ${matchingWhere}
+       ) AS "totalCount",
+       COALESCE(json_agg(page ORDER BY page."createdAt" ${direction}, page.id ${direction}), '[]'::json) AS records
+       FROM (${pageQuery}) page`,
+      values,
+    );
+    rows = counted.records;
+    totalCount = Number(counted.totalCount);
+  } else {
+    ({ rows } = await db().query(pageQuery, values));
+  }
   const leads = rows.slice(0, pageSize);
-  return { leads, nextCursor: rows.length > pageSize ? leads.at(-1).id as string : null };
+  return {
+    leads,
+    nextCursor: rows.length > pageSize ? leads.at(-1)!.id as string : null,
+    ...(totalCount === undefined ? {} : { totalCount }),
+  };
 }
 
 export function listLeads(user: User, params: URLSearchParams) {
@@ -88,14 +116,14 @@ export function listLeads(user: User, params: URLSearchParams) {
 }
 
 export async function listCases(user: User, params: URLSearchParams) {
-  const { leads, nextCursor } = await listRecords(user, params, true);
+  const { leads, nextCursor, totalCount } = await listRecords(user, params, true);
   const cases = leads.map((lead) => ({
     id: lead.caseId,
     leadId: lead.id,
     status: lead.caseStatus,
     lead,
   }));
-  return { cases, nextCursor };
+  return { cases, nextCursor, ...(totalCount === undefined ? {} : { totalCount }) };
 }
 
 export async function getLead(user: User, id: string) {
@@ -115,26 +143,30 @@ export async function getLead(user: User, id: string) {
   return { ...rows[0], notices: notices.rows };
 }
 
-function requiredText(value: unknown, label: string, max: number) {
+function requiredText(value: unknown, label: string, max: number, field: string) {
   if (typeof value !== "string" || !value.trim() || value.trim().length > max || value.includes("\0")) {
-    throw new RequestError(400, `Enter a ${label} of 1 to ${max} characters.`);
+    const message = `Enter a ${label} of 1 to ${max} characters.`;
+    throw new RequestError(400, message, { [field]: message });
   }
   return value.trim();
 }
 
 export async function submitLead(user: User, body: Record<string, unknown>, key: string) {
   if (user.role !== "plaintiff") throw new RequestError(403, "Only plaintiffs can submit a lead.");
-  const name = requiredText(body.name, "name", 120);
-  const email = requiredText(body.email, "valid email address", 254);
+  const name = requiredText(body.name, "name", 120, "name");
+  const email = requiredText(body.email, "valid email address", 254, "email");
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    throw new RequestError(400, "Enter a valid email address.");
+    throw new RequestError(400, "Enter a valid email address.", { email: "Enter a valid email address." });
   }
   const category = typeof body.category === "string" ? body.category : "";
   const region = typeof body.region === "string" ? body.region : "";
   if (!categories.includes(category) || !regions.includes(region)) {
-    throw new RequestError(400, "Choose a category and region.");
+    throw new RequestError(400, "Choose a category and province.", {
+      ...(!categories.includes(category) && { category: "Choose the type of help you need." }),
+      ...(!regions.includes(region) && { region: "Choose the province where your situation took place." }),
+    });
   }
-  const description = requiredText(body.description, "description", 5_000);
+  const description = requiredText(body.description, "description", 2_500, "description");
 
   const hash = requestHash({ name, email, category, region, description });
   return transaction((client) => idempotent(client, user.id, "lead.create", key, hash, async () => {
