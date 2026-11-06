@@ -39,11 +39,11 @@ Maya starts with an Employment request waiting for Northline Legal’s decision 
 3. Open the linked case under **Accepted**. Start work, share a PDF, and add a private note. Switch back to Jordan to see the progress and PDFs.
 4. Switch to Morgan and use **Cases** to find and reassign the case to Harbour. Switch to Sofia at Harbour to see the same case progress and Jordan’s PDF. Jordan can still open the PDF Northline shared, and Morgan can still inspect Northline’s note.
 
-For the admin queue, submit a **Housing** lead in **Quebec**. Morgan can find and assign it under **Unmatched**. A **Housing** lead in **Ontario** routes directly to Harbour Law. Routing is evaluated when a lead is submitted.
+For the admin queue, submit a **Housing** lead in **Quebec**. Morgan can find and assign it under **Needs attention**, alongside leads declined by a firm. Use **All leads** for the full intake history. A **Housing** lead in **Ontario** routes directly to Harbour Law. Routing is evaluated when a lead is submitted.
 
 If a firm declines a lead, Morgan can send it back for review or close it. The plaintiff can see a notice after reassignment or closure. Morgan can open the record to inspect its audit history.
 
-The demo uses seeded sign-in and a fixed routing map. Cases move from **Open** to **In progress** to **Closed**. Closed cases are read-only for plaintiffs and firm staff. Admins can still reassign them. PDFs are limited to 10 MB and stored in the private local folder `.data/documents`. Keep that folder and the database volume to retain uploads between runs.
+The demo uses seeded sign-in and a fixed routing map. Cases move from **New case** to **In progress** to **Closed**. Closed cases are read-only for plaintiffs and firm staff. Admins can still reassign them. PDFs are limited to 10 MB and stored in the private local folder `.data/documents`. Keep that folder and the database volume to retain uploads between runs.
 
 Run `npm run typecheck` or `npm run build` to check the app. Stop the database with `docker compose stop db`.
 

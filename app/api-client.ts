@@ -1,5 +1,5 @@
 export class ApiError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(public readonly status: number, message: string, public readonly fieldErrors?: Record<string, string>) {
     super(message);
   }
 }
@@ -18,7 +18,9 @@ export async function request<T>(path: string, options?: RequestInit): Promise<T
   }
   const data = await response.json().catch(() => null);
   if (!response.ok || data === null) {
-    throw new ApiError(response.status, data?.error ?? "The workspace couldn’t finish that request. Try again.");
+    const fieldErrors = data?.fieldErrors && typeof data.fieldErrors === "object" && !Array.isArray(data.fieldErrors)
+      ? Object.fromEntries(Object.entries(data.fieldErrors).filter((entry): entry is [string, string] => typeof entry[1] === "string")) : undefined;
+    throw new ApiError(response.status, data?.error ?? "The workspace couldn’t finish that request. Try again.", fieldErrors);
   }
   return data as T;
 }

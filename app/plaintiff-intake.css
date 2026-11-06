@@ -68,6 +68,32 @@
   line-height: 1.45;
 }
 
+.plaintiff-intake-form [aria-invalid="true"] {
+  border-color: #a84b43;
+}
+
+.plaintiff-intake-form .plaintiff-intake-field-error {
+  color: #983c35;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.plaintiff-intake-description-feedback {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 5px 15px;
+}
+
+.plaintiff-intake-character-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .plaintiff-intake-description {
   margin-top: 16px;
 }

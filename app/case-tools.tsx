@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { isAccessError, messageFor, request } from "./api-client";
 import "./case-tools.css";
 
 type Role = "plaintiff" | "attorney" | "paralegal" | "admin";
 type CaseStatus = "open" | "in_progress" | "closed";
 type BusyChange = (busy: boolean) => void;
+type DraftChange = (dirty: boolean) => void;
 type CaseTool = "progress" | "documents" | "notes";
 
 type DocumentRecord = {
@@ -28,13 +29,13 @@ type FirmNote = {
 };
 
 const stages: { status: CaseStatus; label: string }[] = [
-  { status: "open", label: "Open" },
+  { status: "open", label: "New case" },
   { status: "in_progress", label: "In progress" },
   { status: "closed", label: "Closed" },
 ];
 
 const statusCopy: Record<CaseStatus, string> = {
-  open: "The firm has opened the case.",
+  open: "The firm has accepted the request. Work has not been marked as started yet.",
   in_progress: "The firm is working on the case.",
   closed: "The firm has closed the case.",
 };
@@ -42,6 +43,13 @@ const statusCopy: Record<CaseStatus, string> = {
 const dateTime = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium", timeStyle: "short" });
 const maxPdfBytes = 10 * 1024 * 1024;
 const maxNoteLength = 2000;
+
+function useDraftReport(dirty: boolean, onDraftChange?: DraftChange) {
+  const report = useRef(onDraftChange);
+  report.current = onDraftChange;
+  useEffect(() => { report.current?.(dirty); }, [dirty]);
+  useEffect(() => () => { report.current?.(false); }, []);
+}
 
 function formatDate(value: string) {
   return dateTime.format(new Date(value));
@@ -178,26 +186,28 @@ function DocumentIcon() {
   );
 }
 
-export function LeadDocuments({ leadId, canUpload, role, onBusyChange, onAccessLost, refreshVersion, disabled = false }: {
+export function LeadDocuments({ leadId, canUpload, role, onBusyChange, onDraftChange, onAccessLost, refreshVersion, disabled = false }: {
   leadId: string;
   canUpload: boolean;
   role: Role;
   onBusyChange?: BusyChange;
+  onDraftChange?: DraftChange;
   onAccessLost?: () => void;
   refreshVersion?: number;
   disabled?: boolean;
 }) {
   if (role === "admin") return null;
   return <Documents key={leadId} leadId={leadId} canUpload={canUpload} role={role} disabled={disabled}
-    onBusyChange={onBusyChange} onAccessLost={onAccessLost} refreshVersion={refreshVersion} />;
+    onBusyChange={onBusyChange} onDraftChange={onDraftChange} onAccessLost={onAccessLost} refreshVersion={refreshVersion} />;
 }
 
-function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLost, refreshVersion }: {
+function Documents({ leadId, canUpload, role, disabled, onBusyChange, onDraftChange, onAccessLost, refreshVersion }: {
   leadId: string;
   canUpload: boolean;
   role: Exclude<Role, "admin">;
   disabled: boolean;
   onBusyChange?: BusyChange;
+  onDraftChange?: DraftChange;
   onAccessLost?: () => void;
   refreshVersion?: number;
 }) {
@@ -209,10 +219,21 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
   const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
   const fileInput = useRef<HTMLInputElement>(null);
   const pendingUpload = useRef<{ file: File; key: string } | undefined>(undefined);
+  const staff = role === "attorney" || role === "paralegal";
+  const selectionStatus = saving ? (staff ? "Sharing…" : "Uploading…") : (staff ? "Selected, not shared" : "Selected, not uploaded");
+  useDraftReport(!!selectedFile, onDraftChange);
+
+  function clearSelection() {
+    if (fileInput.current) fileInput.current.value = "";
+    setSelectedFile(undefined);
+    pendingUpload.current = undefined;
+    setFeedback({});
+    onDraftChange?.(false);
+  }
 
   async function upload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (disabled || saving || !items) return;
+    if (disabled || saving || !items || !canUpload) return;
     const file = selectedFile;
     if (!file) return;
     const invalid = uploadError(file);
@@ -234,7 +255,8 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
       records.refreshFirstPage();
       if (fileInput.current) fileInput.current.value = "";
       setSelectedFile(undefined);
-      setFeedback({ notice: `${file.name} uploaded.` });
+      onDraftChange?.(false);
+      setFeedback({ notice: `${file.name} ${staff ? "shared with the plaintiff" : "uploaded"}.` });
     } catch (failure) {
       if (isAccessError(failure) && onAccessLost) onAccessLost();
       else setFeedback({ error: messageFor(failure) });
@@ -248,36 +270,9 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
     <section className="detail-section case-tool" aria-label={role === "plaintiff" ? "Documents" : "PDFs"}>
       <div>
         <h3>{role === "plaintiff" ? "Documents" : "PDFs"}</h3>
-        <p className="detail-copy">{role === "plaintiff" ? "Documents you upload and PDFs the firm shares with you."
+        <p className="detail-copy">{role === "plaintiff" ? "Your uploads and PDFs shared by the firm."
           : "Plaintiff uploads and PDFs shared by your firm."}</p>
-        {role === "plaintiff" && canUpload && <p className="detail-copy">Supporting PDFs are optional. The firm handling your request can view the PDFs you upload.</p>}
       </div>
-      {canUpload && items && (
-        <form className="case-upload" onSubmit={upload} aria-busy={saving}>
-          <input ref={fileInput} type="file" name="file" accept="application/pdf,.pdf" hidden disabled={disabled || saving}
-            onChange={(event) => {
-              const chosen = event.target.files?.[0];
-              setSelectedFile(chosen);
-              setFeedback(chosen ? { error: uploadError(chosen) } : {});
-            }} />
-          <div className="case-upload-file" aria-live="polite">
-            <span className="document-icon"><DocumentIcon /></span>
-            <div>
-              <strong>{selectedFile?.name ?? "No PDF selected"}</strong>
-              <small>{selectedFile ? `${formatFileSize(selectedFile.size)} · ${saving ? "Uploading…" : "Selected, not uploaded"}` : "PDF only, up to 10 MB"}</small>
-            </div>
-          </div>
-          <div className="case-upload-controls">
-            <button className="button small" type="button" disabled={disabled || saving} onClick={() => fileInput.current?.click()}>
-              {selectedFile ? "Change PDF" : "Add a PDF"}
-            </button>
-            <button className="button small" type="submit" disabled={disabled || saving || !selectedFile || !!uploadError(selectedFile)}>
-              {saving ? "Uploading…" : "Upload PDF"}
-            </button>
-          </div>
-        </form>
-      )}
-      <Feedback {...feedback} />
       {error ? <LoadError error={error} retry={retry} /> : loading || !items ? <p className="detail-copy" role="status">Loading PDFs…</p> :
         items.length ? (
           <ul className="file-list">
@@ -297,15 +292,62 @@ function Documents({ leadId, canUpload, role, disabled, onBusyChange, onAccessLo
           </ul>
         ) : <p className="detail-empty">No PDFs have been shared yet.</p>}
       {!error && <RecordPagination records={records} label="PDF pages" disabled={disabled || saving} />}
+      {(canUpload || selectedFile) && items && (
+        <form className={`case-upload${selectedFile ? " has-selection" : ""}`} onSubmit={upload} aria-busy={saving}>
+          <input ref={fileInput} type="file" name="file" accept="application/pdf,.pdf" hidden disabled={disabled || saving || loading || !canUpload}
+            onChange={(event) => {
+              const chosen = event.target.files?.[0];
+              setSelectedFile(chosen);
+              setFeedback(chosen ? { error: uploadError(chosen) } : {});
+              onDraftChange?.(!!chosen);
+            }} />
+          {selectedFile ? <>
+            <div className="case-upload-file" aria-live="polite">
+              <span className="document-icon"><DocumentIcon /></span>
+              <div>
+                <strong>{selectedFile.name}</strong>
+                <small>{formatFileSize(selectedFile.size)} · {selectionStatus}</small>
+              </div>
+            </div>
+            <p className="case-upload-visibility">{staff
+              ? "Sharing makes this PDF visible to the plaintiff and staff at your firm."
+              : "The firm handling your request can view PDFs you upload."}</p>
+            <div className="case-upload-controls">
+              <button className="button small" type="submit" disabled={disabled || saving || loading || !canUpload || !!uploadError(selectedFile)}>
+                {saving ? (staff ? "Sharing…" : "Uploading…") : staff ? "Share PDF" : "Upload PDF"}
+              </button>
+              <button className="button small" type="button" disabled={disabled || saving || loading || !canUpload} onClick={() => fileInput.current?.click()}>Change PDF</button>
+              <button className="subtle-link case-clear-draft" type="button" disabled={disabled || saving} onClick={clearSelection}>Remove selection</button>
+            </div>
+          </> : <div className="case-upload-prompt">
+            <button className="button small" type="button" disabled={disabled || saving || loading || !canUpload} onClick={() => fileInput.current?.click()}>Add a PDF</button>
+            <span>PDF only, up to 10 MB</span>
+          </div>}
+        </form>
+      )}
+      <Feedback {...feedback} />
     </section>
   );
 }
 
-function Notes({ caseId, canWrite, disabled, onBusyChange, onAccessLost, refreshVersion }: {
+export function AdminCaseNotes({ caseId, disabled = false, onBusyChange, onAccessLost, refreshVersion }: {
+  caseId: string;
+  disabled?: boolean;
+  onBusyChange: BusyChange;
+  onAccessLost?: () => void;
+  refreshVersion?: number;
+}) {
+  return <Notes key={caseId} caseId={caseId} canWrite={false} staff={false} disabled={disabled}
+    onBusyChange={onBusyChange} onAccessLost={onAccessLost} refreshVersion={refreshVersion} />;
+}
+
+function Notes({ caseId, canWrite, staff, disabled, onBusyChange, onDraftChange, onAccessLost, refreshVersion }: {
   caseId: string;
   canWrite: boolean;
+  staff: boolean;
   disabled: boolean;
   onBusyChange: BusyChange;
+  onDraftChange?: DraftChange;
   onAccessLost?: () => void;
   refreshVersion?: number;
 }) {
@@ -316,10 +358,11 @@ function Notes({ caseId, canWrite, disabled, onBusyChange, onAccessLost, refresh
   const [body, setBody] = useState("");
   const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
   const pendingNote = useRef<{ body: string; key: string } | undefined>(undefined);
+  useDraftReport(!!body.trim(), onDraftChange);
 
   async function addNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (disabled || saving || !body.trim()) return;
+    if (disabled || saving || !canWrite || !body.trim()) return;
     setSaving(true);
     setFeedback({});
     onBusyChange(true);
@@ -330,6 +373,7 @@ function Notes({ caseId, canWrite, disabled, onBusyChange, onAccessLost, refresh
       pendingNote.current = undefined;
       records.refreshFirstPage();
       setBody("");
+      onDraftChange?.(false);
       setFeedback({ notice: "Private note added." });
     } catch (failure) {
       if (isAccessError(failure) && onAccessLost) onAccessLost();
@@ -344,18 +388,24 @@ function Notes({ caseId, canWrite, disabled, onBusyChange, onAccessLost, refresh
     <section className="detail-section case-tool" aria-label="Firm-private notes">
       <div>
         <h3>Firm-private notes</h3>
-        <p className="detail-copy">Notes stay with the firm that wrote them. Authorized admins can review them.</p>
+        <p className="detail-copy">{staff ? "Visible to staff at your firm and authorized admins."
+          : "Notes stay with the firm that wrote them. Authorized admins can review them."}</p>
       </div>
-      {canWrite && items && (
+      {(canWrite || (staff && body.trim())) && items && (
         <form className="case-note-form" onSubmit={addNote}>
           <label className="field">Private note
             <textarea name="body" required maxLength={maxNoteLength} value={body}
-              onChange={(event) => { setBody(event.target.value); setFeedback({}); }}
+              onChange={(event) => { setBody(event.target.value); setFeedback({}); onDraftChange?.(!!event.target.value.trim()); }}
+              readOnly={!canWrite}
               disabled={disabled || saving} />
           </label>
-          <button className="button small" type="submit" disabled={disabled || saving || !body.trim()}>
-            {saving ? "Adding…" : "Add note"}
-          </button>
+          <div className="case-note-actions">
+            <button className="button small" type="submit" disabled={disabled || saving || !canWrite || !body.trim()}>
+              {saving ? "Adding…" : "Add note"}
+            </button>
+            {staff && body.trim() && <button className="subtle-link case-clear-draft" type="button" disabled={disabled || saving}
+              onClick={() => { setBody(""); pendingNote.current = undefined; setFeedback({}); onDraftChange?.(false); }}>Clear draft</button>}
+          </div>
         </form>
       )}
       <Feedback {...feedback} />
@@ -379,13 +429,14 @@ function Notes({ caseId, canWrite, disabled, onBusyChange, onAccessLost, refresh
   );
 }
 
-export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusyChange, onAccessLost, refreshVersion, disabled = false }: {
+export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusyChange, onDraftChange, onAccessLost, refreshVersion, disabled = false }: {
   caseId: string;
   leadId: string;
   status: CaseStatus;
   role: Role;
   onStatusChange: (status: CaseStatus) => void;
   onBusyChange?: BusyChange;
+  onDraftChange?: DraftChange;
   onAccessLost?: () => void;
   refreshVersion?: number;
   disabled?: boolean;
@@ -395,11 +446,24 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
   const [feedback, setFeedback] = useState<{ error?: string; notice?: string }>({});
   const closeDialog = useRef<HTMLDialogElement>(null);
   const tabButtons = useRef<(HTMLButtonElement | null)[]>([]);
+  const draftParts = useRef({ documents: false, notes: false });
+  const draftChange = useRef(onDraftChange);
+  draftChange.current = onDraftChange;
+  const [hasDraft, setHasDraft] = useState(false);
+  const reportDraft = useCallback((tool: "documents" | "notes", dirty: boolean) => {
+    draftParts.current[tool] = dirty;
+    const next = draftParts.current.documents || draftParts.current.notes;
+    setHasDraft(next);
+    draftChange.current?.(next);
+  }, []);
+  const reportDocuments = useCallback((dirty: boolean) => reportDraft("documents", dirty), [reportDraft]);
+  const reportNotes = useCallback((dirty: boolean) => reportDraft("notes", dirty), [reportDraft]);
+  useEffect(() => () => { draftChange.current?.(false); }, []);
   const staff = role === "attorney" || role === "paralegal";
   const busy = disabled || !!action;
   const tabs = [
     ...(role !== "admin" ? [{ id: "documents" as const, label: "Documents" }] : []),
-    ...(role !== "plaintiff" ? [{ id: "notes" as const, label: "Notes" }] : []),
+    ...(role !== "plaintiff" ? [{ id: "notes" as const, label: staff ? "Private notes" : "Notes" }] : []),
   ];
   const visibleTab = tabs.some((tab) => tab.id === activeTab) ? activeTab : tabs[0].id;
   const currentStage = stages.findIndex((stage) => stage.status === status);
@@ -411,13 +475,13 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
   }
 
   async function updateProgress() {
-    if (!nextStatus || busy) return;
+    if (!nextStatus || busy || (nextStatus === "closed" && hasDraft)) return;
     report("progress", true);
     setFeedback({});
     try {
       const updated = await request<{ status: CaseStatus }>(`/api/cases/${caseId}/status`, jsonRequest("PATCH", { status: nextStatus }));
       onStatusChange(updated.status);
-      setFeedback({ notice: updated.status === "closed" ? "Case closed." : "Case progress updated." });
+      setFeedback({ notice: `Moved to ${stages.find((stage) => stage.status === updated.status)?.label ?? updated.status}.` });
     } catch (failure) {
       if (isAccessError(failure) && onAccessLost) onAccessLost();
       else setFeedback({ error: messageFor(failure) });
@@ -428,12 +492,13 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
 
   return (
     <>
-      <section className="detail-section case-tool" aria-label="Case progress">
-        <div>
-          <h3>Case progress</h3>
-          {role !== "plaintiff" && <p className="detail-copy">{statusCopy[status]}</p>}
-        </div>
-        <ol className="case-progress">
+      <section className={`detail-section case-tool${staff ? " case-progress-compact" : ""}`} aria-label="Case progress">
+        {staff ? <div className="case-progress-current">
+          <h3>Progress</h3>
+          <span className="case-progress-status">{stages[currentStage].label}</span>
+        </div> : <>
+          {role !== "plaintiff" && <div><h3>Case progress</h3><p className="detail-copy">{statusCopy[status]}</p></div>}
+          <ol className="case-progress">
           {stages.map((stage, index) => (
             <li key={stage.status}
               className={`progress-step${index < currentStage ? " is-complete" : index === currentStage ? " is-current" : ""}`}
@@ -441,16 +506,18 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
               <span className="progress-marker" aria-hidden="true">{index < currentStage ? "✓" : index + 1}</span>{stage.label}
             </li>
           ))}
-        </ol>
+          </ol>
+        </>}
         {staff && nextStatus && (
           <div className="case-progress-action">
             <button className={nextStatus === "closed" ? "button danger small" : "button primary small"}
-              type="button" disabled={busy} onClick={() => {
+              type="button" disabled={busy || (nextStatus === "closed" && hasDraft)} onClick={() => {
                 if (nextStatus === "closed") closeDialog.current?.showModal();
                 else void updateProgress();
               }}>
-              {action === "progress" ? "Updating…" : nextStatus === "closed" ? "Close case" : "Mark in progress"}
+              {action === "progress" ? "Updating…" : nextStatus === "closed" ? "Close case" : "Start work"}
             </button>
+            {nextStatus === "closed" && hasDraft && <p className="detail-copy">Finish or clear your unsent work before closing this case.</p>}
             {nextStatus === "closed" && (
               <dialog ref={closeDialog} aria-labelledby="close-case-title" aria-describedby="close-case-description">
                 <div className="dialog-head"><h2 id="close-case-title">Close this case?</h2></div>
@@ -459,7 +526,7 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
                 </p></div>
                 <form className="dialog-footer" method="dialog">
                   <button className="button" type="submit">Cancel</button>
-                  <button className="button primary danger" type="button" disabled={busy} onClick={() => {
+                  <button className="button primary danger" type="button" disabled={busy || hasDraft} onClick={() => {
                     closeDialog.current?.close();
                     void updateProgress();
                   }}>Close case</button>
@@ -468,6 +535,7 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
             )}
           </div>
         )}
+        {staff && status === "closed" && <p className="case-read-only" role="status">Closed cases are read-only. Existing PDFs and private notes remain available.</p>}
         <Feedback {...feedback} />
       </section>
       <div className="case-content">
@@ -497,16 +565,16 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
             hidden={visibleTab !== "documents"} className="case-content-panel motion-enter motion-detail">
             <LeadDocuments leadId={leadId} canUpload={status !== "closed"} role={role}
               disabled={busy} onBusyChange={(saving) => report("documents", saving)}
-              onAccessLost={onAccessLost} refreshVersion={refreshVersion} />
+              onDraftChange={reportDocuments} onAccessLost={onAccessLost} refreshVersion={refreshVersion} />
           </div>
         )}
         {role !== "plaintiff" && (
           <div id={`${caseId}-notes-panel`} role={tabs.length > 1 ? "tabpanel" : undefined}
             aria-labelledby={tabs.length > 1 ? `${caseId}-notes-tab` : undefined}
             hidden={visibleTab !== "notes"} className="case-content-panel motion-enter motion-detail">
-            <Notes key={caseId} caseId={caseId} canWrite={staff && status !== "closed"}
+            <Notes key={caseId} caseId={caseId} staff={staff} canWrite={staff && status !== "closed"}
               disabled={busy} onBusyChange={(saving) => report("notes", saving)}
-              onAccessLost={onAccessLost} refreshVersion={refreshVersion} />
+              onDraftChange={reportNotes} onAccessLost={onAccessLost} refreshVersion={refreshVersion} />
           </div>
         )}
       </div>

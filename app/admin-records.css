@@ -1,0 +1,325 @@
+.admin-record-detail {
+  display: grid;
+  gap: 24px;
+  padding: 22px 28px 30px;
+}
+
+.admin-record-context dl,
+.admin-record-metadata {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+
+.admin-record-context dl {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.admin-record-context dt,
+.admin-record-metadata dt {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.admin-record-context dd,
+.admin-record-metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.admin-record-context dd {
+  font-weight: 600;
+}
+
+.admin-record-detail h3 {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.admin-record-detail > .detail-section,
+.admin-record-tabpanel > .detail-section {
+  margin-top: 0;
+}
+
+.admin-assignment {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--canvas);
+}
+
+.admin-assignment-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 15px;
+}
+
+.admin-assignment-heading > .subtle-link {
+  font-size: 12px;
+}
+
+.admin-assignment-form .field {
+  font-size: 12px;
+}
+
+.admin-assignment-form .field select {
+  min-height: 39px;
+}
+
+.admin-firm-select {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+
+.admin-firm-select select {
+  width: 100%;
+  appearance: none;
+  padding-right: 37px;
+}
+
+.admin-firm-select > svg {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.admin-assignment-review {
+  padding: 13px 14px;
+  border: 1px solid #d8deec;
+  border-radius: 7px;
+  background: var(--paper);
+}
+
+.admin-assignment-transfer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.admin-assignment-transfer > span:first-child {
+  color: var(--muted);
+}
+
+.admin-assignment-transfer strong {
+  color: var(--indigo);
+  font-weight: 650;
+}
+
+.admin-assignment-review ul {
+  display: grid;
+  gap: 7px;
+  margin: 12px 0 0;
+  padding-left: 17px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.admin-assignment .detail-actions {
+  gap: 10px;
+}
+
+.admin-assignment .detail-actions .button {
+  min-height: 37px;
+  margin: 0;
+}
+
+.admin-assignment .detail-actions .subtle-link {
+  font-size: 12px;
+}
+
+.admin-assignment-outcome {
+  padding: 12px 14px;
+  border-left: 2px solid var(--indigo);
+  color: var(--indigo);
+  background: var(--indigo-pale);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.admin-assignment-outcome p:focus {
+  outline: none;
+}
+
+.admin-record-error,
+.admin-history-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.admin-record-linked-case,
+.admin-record-closed {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 17px 18px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--canvas);
+}
+
+.admin-record-linked-case p,
+.admin-record-closed p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.admin-record-intake {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-record-description {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.admin-record-intake summary {
+  width: fit-content;
+  color: var(--indigo);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-record-intake details[open] > .admin-record-description {
+  margin-top: 13px;
+}
+
+.admin-record-metadata {
+  margin-top: 16px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-record-reference {
+  grid-column: 1 / -1;
+}
+
+.admin-record-reference dd {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.admin-record-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-record-tabs button {
+  min-height: 39px;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.admin-record-tabs button[aria-selected="true"] {
+  border-bottom-color: var(--indigo);
+  color: var(--indigo);
+  font-weight: 600;
+}
+
+.admin-record-tabs button:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
+}
+
+.admin-record-tabpanel[hidden] {
+  display: none;
+}
+
+.admin-record-information {
+  padding-top: 17px;
+  border-top: 1px solid var(--line);
+}
+
+.admin-record-detail .admin-history ol {
+  gap: 18px;
+}
+
+.admin-history-event {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.admin-history-change {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.admin-history-change > span:first-child {
+  margin-right: 7px;
+  font-weight: 600;
+}
+
+.admin-history-date {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.admin-history > .subtle-link {
+  justify-self: start;
+  font-size: 12px;
+}
+
+@media (max-width: 560px) {
+  .admin-record-detail {
+    gap: 21px;
+    padding: 20px 19px 28px;
+  }
+
+  .admin-record-context dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-assignment {
+    padding: 15px;
+  }
+
+  .admin-assignment-review {
+    padding: 12px;
+  }
+
+  .admin-assignment .detail-actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .admin-record-tabs button {
+    transition: color 150ms ease, border-color 150ms ease;
+  }
+}

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 export class RequestError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(public readonly status: number, message: string, public readonly fieldErrors?: Record<string, string>) {
     super(message);
   }
 }
@@ -21,7 +21,7 @@ export async function api(request: NextRequest, run: () => Promise<NextResponse>
     }
     return await run();
   } catch (error) {
-    if (error instanceof RequestError) return json({ error: error.message }, error.status);
+    if (error instanceof RequestError) return json({ error: error.message, ...(error.fieldErrors && { fieldErrors: error.fieldErrors }) }, error.status);
     console.error(error);
     return json({ error: "Something went wrong. Please try again." }, 500);
   }

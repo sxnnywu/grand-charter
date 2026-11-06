@@ -169,30 +169,22 @@
   grid-column: 1 / -1;
 }
 
-.plaintiff-case-label {
-  margin-bottom: 7px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
 .plaintiff-case-summary {
   display: grid;
   justify-items: start;
-  gap: 14px;
+  gap: 10px;
+}
+
+.plaintiff-case-status-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 
 .plaintiff-case-firm {
-  display: grid;
-  gap: 3px;
-}
-
-.plaintiff-case-firm span {
   color: var(--muted);
-  font-size: 11px;
-}
-
-.plaintiff-case-firm strong {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -201,6 +193,11 @@
   color: var(--muted);
   font-size: 13px;
   line-height: 1.6;
+}
+
+.plaintiff-case-documents {
+  min-height: 32px;
+  font-size: 12px;
 }
 
 .plaintiff-case-content > .case-tool {
@@ -229,8 +226,8 @@
   }
 
   .plaintiff-record-header {
-    gap: 20px;
-    padding: 22px 20px;
+    gap: 15px;
+    padding: 18px 20px;
   }
 
   .plaintiff-record-body {
