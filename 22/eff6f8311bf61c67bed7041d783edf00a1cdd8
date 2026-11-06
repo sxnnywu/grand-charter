@@ -1,0 +1,79 @@
+app/firm-workspace.tsx
+  s_079498f144b51a::t_ce0e39248deb76 800
+  s_079498f144b51a::t_8cf2f125850525 14,86-87,164,347-348,597-599,664,668-671,717,722,782
+app/admin-workspace.tsx
+  s_079498f144b51a::t_ce0e39248deb76 500
+  s_079498f144b51a::t_defd12d945ed51 69-70,330-331,342,396-398,431,434-435,441-442,482
+  s_079498f144b51a::t_295bbf3a4896e9 17,501-506,517,519,528
+db/migrations/008_case_transfers.sql
+  s_079498f144b51a::t_b111a7bae3a985 1-16
+app/plaintiff-view.css
+  s_079498f144b51a::t_5e39997291e29f 34,36,314-359
+  s_079498f144b51a::t_9ce227ceed8cca 360
+app/firm-case-board.tsx
+  s_079498f144b51a::t_ce0e39248deb76 256-257
+app/plaintiff-view.tsx
+  s_079498f144b51a::t_276809079529d1 4,143,152,164-174,209,212,250-254,284,291,304
+app/admin-tools.tsx
+  s_079498f144b51a::t_2d182b14b41747 9,36-39,67-68,91,93,99,109-110,144-147,162-163,165
+app/api/case-transfers/[id]/accept/route.ts
+  s_079498f144b51a::t_1287d573bf8662 1-12
+app/api/case-transfers/[id]/decline/route.ts
+  s_079498f144b51a::t_ac8e4eaa0bcef4 1-12
+app/api/cases/[id]/transfer/cancel/route.ts
+  s_079498f144b51a::t_fd96047c58ce3e 1-12
+app/api/leads/[id]/accept/route.ts
+  s_079498f144b51a::t_81bfb52eaed108 3,10-11
+app/case-tools.tsx
+  s_079498f144b51a::t_6a5f1799e6b1e5 514,522,524,527-528,531
+app/firm-records.tsx
+  s_079498f144b51a::t_4853fbcb236432 95,116-117,124,137,140,143,154
+app/globals.css
+  s_079498f144b51a::t_128783732ef7c7 491-498
+app/plaintiff-records.css
+  s_079498f144b51a::t_ed77ff5b644523 312-313
+app/plaintiff-records.tsx
+  s_079498f144b51a::t_6adc0ccde530d7 75
+app/workdesk-title.tsx
+  s_079498f144b51a::t_16bb7c09735582 1-8
+app/workdesk.css
+  s_079498f144b51a::t_16036cae471f38 27,29,205-227
+app/workspace-motion.ts
+  s_079498f144b51a::t_660ac4d6b03242 5,27,73-79
+app/workspace.tsx
+  s_079498f144b51a::t_3149bfa7f97c7f 26-29,31-32,1031
+docs/api-routes.md
+  s_079498f144b51a::t_2f88b5ce826de1 34,71-80
+docs/data-model.md
+  s_079498f144b51a::t_eadf277bfbdbe4 14-18,39
+docs/decisions.md
+  s_079498f144b51a::t_ef35abe28db6ee 12
+docs/identity-and-access.md
+  s_079498f144b51a::t_4e8bdb21455800 7,31-32
+docs/requirements.md
+  s_079498f144b51a::t_6a4eb9096a95cc 111,127
+docs/workflow-rules.md
+  s_079498f144b51a::t_ef2ce260ee280a 56-57,60,65-67,71-90,97,99,106,110
+server/admin.ts
+  s_079498f144b51a::t_23ab98a91d4482 136-174
+server/documents.ts
+  s_079498f144b51a::t_161715cbf7d286 5,18-19,41,45,171
+server/leads.ts
+  s_079498f144b51a::t_349f6a1e7059a1 11-17,25-44,51,58,69,75-82,124,152,183,249-250,258-259,263-281,289,303,306,316-328,333
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "22eff6f8311bf61c67bed7041d783edf00a1cdd8",
+  "prompts": {},
+  "sessions": {
+    "s_079498f144b51a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1a8ad-f620-7f02-8c39-3413c6747d65",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Sunny Wu <w.sunny0618@gmail.com>"
+    }
+  }
+}
