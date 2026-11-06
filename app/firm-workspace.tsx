@@ -11,6 +11,7 @@ import { caseViews, emptyFirmLocation, firmListUrl, firmUrl, leadViews, readFirm
 import { animateWorkspace, stopWorkspaceTransition } from "./workspace-motion";
 import type { Account, Lead, User } from "./workspace";
 import "./firm-workspace.css";
+import "./workdesk.css";
 
 type Decision = "accept" | "decline";
 type Page = { path: string; items: Lead[]; nextCursor: string | null };
@@ -85,6 +86,7 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
   const locationRef = useRef(location);
   locationRef.current = location;
   const memories = useRef<Record<FirmView, FirmLocation>>({ leads: emptyFirmLocation("leads"), cases: { ...emptyFirmLocation("cases"), layout: location.layout } });
+  const [filtersExpanded, setFiltersExpanded] = useState(!!(location.region || location.category));
   const [search, setSearch] = useState(location.query);
   const searchInput = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState<Page>();
@@ -653,6 +655,11 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
       {filtered ? "Clear filters" : location.view === "leads" ? "View cases" : location.filter === "all" ? "Review leads" : "View all cases"}
     </button>
   </div>;
+  const deskItems = board ? boardRecords?.path === path ? boardRecords.groups.flatMap(group => group.items) : [] : items;
+  const focusItem = location.view === "leads"
+    ? deskItems.find(item => item.status === "awaiting_firm_review") ?? deskItems[0]
+    : deskItems.find(item => item.caseStatus !== "closed") ?? deskItems[0];
+  const focusReady = !loading && !pendingCollection && !listError && (board ? boardSummary?.path === path && !boardSummary.summary.loading && !boardSummary.summary.error : !!currentPage);
   const role = user.role === "paralegal" ? "paralegal" : "attorney";
   const record = lead ? location.caseId && lead.caseId === location.caseId ? <FirmCaseDetail key={location.caseId}
     id={location.caseId} initialRecord={preparedCases.current.get(location.caseId)} lead={lead} role={role} drawer onBack={() => select()} locked={locked} onBusyChange={setChildBusy}
@@ -668,7 +675,7 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
         : <h2>Loading details…</h2>}
     </div>;
 
-  return <div className="shell demo-portal firm-shell">
+  return <div className="shell demo-portal firm-shell workdesk">
     <main className="main">
       <header className="topbar firm-topbar" inert={drawer}>
         <Brand />
@@ -696,16 +703,30 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
         {openingWorkspace ? <div className="portal-page firm-arriving" role="status">Opening your workspace…</div> : <div className={`portal-page firm-page${location.leadId ? " has-selection" : ""}${board ? " is-board" : ""}`}>
           <header className="page-heading firm-page-heading" inert={drawer}>
             <div className="firm-heading-copy">
-            <h1 tabIndex={-1} ref={heading}>{location.view === "leads" ? "Leads" : "Cases"}</h1>
-            <p>{location.view === "leads" ? "Review requests. Accept a lead to start a case." : "Your firm’s accepted work."}</p>
+            <p className="workdesk-eyebrow">{user.firmName} · {location.view === "leads" ? "Incoming requests" : "Accepted work"}</p>
+            <h1 tabIndex={-1} ref={heading} aria-label={location.view === "leads" ? "Leads" : "Cases"}>
+              <span key={location.view} className="workdesk-heading-word" aria-hidden="true"><span>{location.view === "leads" ? "Leads" : "Cases"}</span></span>
+            </h1>
+            <p key={location.view} className="workdesk-description">{location.view === "leads" ? "Meet the people asking for your help. Review a request to decide whether your firm can take it on." : "The work your firm has taken on. Keep each case moving and its documents together."}</p>
             </div>
+            <aside key={location.view} className="workdesk-focus" aria-label="Next action">
+              <span className="workdesk-focus-label">{location.view === "leads" ? location.filter === "awaiting_firm_review" ? "Next to review" : "From this view" : "Continue a case"}</span>
+              <p className="workdesk-focus-title">{focusItem?.name ?? (!focusReady ? "Getting your workspace ready" : (location.view === "leads" ? "No leads in this view" : "No cases in this view"))}</p>
+              <p className="workdesk-focus-copy">{focusItem ? firmIssueExcerpt(focusItem.title || focusItem.description, 115) : !focusReady ? "Your records will be ready shortly." : location.view === "leads" ? "You can continue with your firm’s accepted work." : "Review incoming leads to start a new case."}</p>
+              <button className="button workdesk-primary" type="button" disabled={navigationLocked || !focusReady}
+                onClick={() => focusItem ? select(focusItem) : changeView(location.view === "leads" ? "cases" : "leads")}>
+                {focusItem ? location.view === "cases" ? "Open case" : focusItem.status === "awaiting_firm_review" ? "Review next lead" : "Open lead" : location.view === "leads" ? "View cases" : "Review leads"}<span aria-hidden="true">↗</span>
+              </button>
+            </aside>
+          </header>
+          <div className="workdesk-collection-heading" inert={drawer}><div><h2>{location.view === "leads" ? "Your inbox" : "Casework"}</h2><span>{location.view === "leads" ? "Accept a lead to open its case." : "Track progress, share documents, and keep private notes."}</span></div>
             {location.view === "cases" && <div className="firm-layout-controls" role="group" aria-label="Case layout">
               {(["list", "board"] as const).map((layout) => <button type="button" key={layout} aria-pressed={location.layout === layout}
                 aria-busy={pendingCollection?.view === "cases" && pendingCollection.layout === layout}
                 data-pending={pendingCollection?.view === "cases" && pendingCollection.layout === layout || undefined}
                 disabled={navigationLocked} onClick={() => changeLayout(layout)}><LayoutIcon layout={layout} />{layout === "list" ? "List" : "Board"}</button>)}
             </div>}
-          </header>
+          </div>
           <div className="firm-list-controls" inert={drawer}>
             {!board && <nav className="firm-view-tabs" aria-label={location.view === "leads" ? "Lead views" : "Case views"}>
               {(location.view === "leads" ? leadViews : caseViews).map(([value, title]) => <button className="staff-tab" type="button" key={value}
@@ -727,12 +748,16 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
                 </span></div>
                 <button className="button" type="submit" disabled={navigationLocked}>Search</button>
               </form>
+              <button className="button workdesk-filter-toggle" type="button" aria-expanded={filtersExpanded} aria-controls="firm-desk-filters" disabled={navigationLocked}
+                onClick={() => setFiltersExpanded(open => !open)}>Filters{(location.region || location.category) && <span className="workdesk-filter-count">{Number(!!location.region) + Number(!!location.category)}</span>}<span aria-hidden="true">{filtersExpanded ? "−" : "+"}</span></button>
+              <div className="workdesk-filter-reveal" data-open={filtersExpanded} inert={!filtersExpanded} id="firm-desk-filters"><div className="workdesk-filter-fields">
               <label className="field">Province<span className="firm-select"><select value={location.region} disabled={navigationLocked}
                 onChange={(event) => navigate({ ...location, region: event.target.value, leadId: undefined, caseId: undefined })}>
                 <option value="">All provinces</option>{regions.map((region) => <option key={region}>{region}</option>)}</select><Chevron down /></span></label>
               <label className="field">Category<span className="firm-select"><select value={location.category} disabled={navigationLocked}
                 onChange={(event) => navigate({ ...location, category: event.target.value, leadId: undefined, caseId: undefined })}>
                 <option value="">All categories</option>{categories.map((category) => <option key={category}>{category}</option>)}</select><Chevron down /></span></label>
+              </div></div>
             </div>}
             <div className="firm-active-filters" aria-label="Active filters">
               {location.query && <button type="button" className="firm-filter-chip" disabled={navigationLocked} aria-label="Remove search filter"

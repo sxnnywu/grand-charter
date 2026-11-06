@@ -768,19 +768,31 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       const { lead: created } = await post<{ lead: Lead }>("/api/leads", input, {
         "Idempotency-Key": intakeAttempt.current.key,
       });
-      resetIntakeDraft();
       // A list response from before this write must not replace the new request.
       listRevision.current += 1;
       setLeads((current) => [created, ...(current ?? []).filter(({ id }) => id !== created.id)]);
       setListAttempt((current) => current + 1);
-      if (submittedAtHistory !== historyRevision.current) {
+      let presented = false;
+      const finishSubmission = () => {
+        presented = true;
+        resetIntakeDraft();
+        if (submittedAtHistory !== historyRevision.current) {
+          setNotice("Your request was submitted. You can find it in My requests & cases.");
+          return;
+        }
+        preparedLead.current = created.id;
+        applySelection(created.id, undefined, "all", false, "all");
+        setLeadResult({ id: created.id, lead: created });
+        setSubmitted(created);
+        window.scrollTo(0, 0);
+      };
+      if (submittedAtHistory !== historyRevision.current) finishSubmission();
+      else await animateWorkspace("submission", finishSubmission);
+      // Navigation can cancel the animation after the server has saved the request.
+      if (!presented) {
+        resetIntakeDraft();
         setNotice("Your request was submitted. You can find it in My requests & cases.");
-        return;
       }
-      applySelection(created.id, undefined, "all", false, "all");
-      setLeadResult({ id: created.id, lead: created });
-      setComposing(false);
-      setSubmitted(created);
     } catch (error) {
       setActionError(messageFor(error));
       if (error instanceof ApiError && error.fieldErrors) setIntakeFieldErrors(error.fieldErrors);

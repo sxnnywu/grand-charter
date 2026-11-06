@@ -14,6 +14,7 @@ import { animateWorkspace } from "./workspace-motion";
 import type { Account, Lead, User } from "./workspace";
 import "./admin-workspace.css";
 import "./firm-workspace.css";
+import "./workdesk.css";
 
 type Page = { path: string; items: Lead[]; nextCursor: string | null; totalCount: number };
 type RecordResult = { id: string; lead: Lead };
@@ -68,6 +69,7 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
   const locationRef = useRef(location);
   locationRef.current = location;
   const [pending, setPending] = useState<AdminLocation>();
+  const [filtersExpanded, setFiltersExpanded] = useState(!!(location.firmId || location.region || location.category));
   const [search, setSearch] = useState(location.query);
   const searchInput = useRef<HTMLInputElement>(null);
   const [page, setPage] = useState<Page>();
@@ -398,7 +400,7 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
     location.category ? { key: "category" as const, label: location.category } : undefined,
   ].filter((chip) => chip !== undefined);
 
-  return <div className="shell admin-shell">
+  return <div className="shell admin-shell workdesk">
     <header className="topbar admin-topbar" inert={drawer}>
       <Brand /><span className="admin-workspace-label">Platform admin</span>
       <div className="topbar-actions"><AccountSwitcher user={user} accounts={accounts} disabled={navigationLocked}
@@ -417,16 +419,29 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
           </button>)}
         </nav>
         <header className="admin-page-heading firm-page-heading">
-          <div><h1 ref={heading} tabIndex={-1}>{title}</h1><p>{description}</p></div>
+          <div className="workdesk-heading-copy"><p className="workdesk-eyebrow">Platform admin · {location.view === "attention" ? "Assignment desk" : location.view === "cases" ? "Accepted work" : "Request register"}</p>
+            <h1 ref={heading} tabIndex={-1} aria-label={title}><span key={location.view} className="workdesk-heading-word" aria-hidden="true"><span>{title}</span></span></h1><p key={location.view} className="workdesk-description">{description}</p></div>
+          <aside key={location.view} className="workdesk-focus" aria-label="Next action">
+            <span className="workdesk-focus-label">{location.view === "attention" ? "Ready for a decision" : location.view === "cases" ? "Across your firms" : "From this view"}</span>
+            <p className="workdesk-focus-title">{location.view === "attention" ? totalAttention === undefined ? "Checking the queue" : totalAttention === 0 ? "Everything has a next step" : `${totalAttention} ${totalAttention === 1 ? "lead needs" : "leads need"} attention` : items[0]?.name ?? (loading ? "Getting records ready" : "No records in this view")}</p>
+            <p className="workdesk-focus-copy">{location.view === "attention" ? "Choose a firm for unassigned requests. Give declined leads a next step." : items[0] ? firmIssueExcerpt(items[0].title || items[0].description, 115) : "Use the register to review requests, assignments, and case progress."}</p>
+            {location.view === "attention" && <div className="workdesk-queue-counts" aria-label="Unfiltered attention counts">
+              <button type="button" disabled={navigationLocked || !counts} aria-pressed={controls.status === "pending_assignment"} onClick={() => filter({ status: controls.status === "pending_assignment" ? "all" : "pending_assignment" })}><strong>{counts?.unassigned ?? "…"}</strong><span>Need a firm</span></button>
+              <button type="button" disabled={navigationLocked || !counts} aria-pressed={controls.status === "declined"} onClick={() => filter({ status: controls.status === "declined" ? "all" : "declined" })}><strong>{counts?.declined ?? "…"}</strong><span>Firm declined</span></button>
+            </div>}
+            <button className="button workdesk-primary" type="button" disabled={locked || loading || !!listError || !currentPage && !board || board && (!currentBoardSummary || currentBoardSummary.loading || currentBoardSummary.error)}
+              onClick={() => items[0] ? select(items[0]) : changeView(location.view === "attention" ? "leads" : "attention")}>
+              {items[0] ? location.view === "attention" ? "Review next lead" : location.view === "cases" ? "Open case" : "Open lead" : location.view === "attention" ? "Browse all leads" : "View attention queue"}<span aria-hidden="true">↗</span>
+            </button>
+          </aside>
+        </header>
+        <div className="workdesk-collection-heading"><div><h2>{location.view === "attention" ? "The queue" : location.view === "cases" ? "Casework" : "All requests"}</h2><span>{location.view === "attention" ? location.sort === "oldest" ? "Oldest requests first." : "Most recent requests first." : location.view === "cases" ? "Progress and ownership across firms." : "Every request and its current assignment."}</span></div>
           {location.view === "cases" && <div className="firm-layout-controls" role="group" aria-label="Case layout">
             {(["list", "board"] as const).map((layout) => <button type="button" key={layout} aria-pressed={location.layout === layout}
               data-pending={pending?.layout === layout || undefined} aria-busy={pending?.layout === layout || undefined}
               disabled={navigationLocked} onClick={() => changeLayout(layout)}>{layout === "list" ? "List" : "Board"}</button>)}
           </div>}
-          {location.view === "attention" && <div className="admin-attention-breakdown" aria-label="Unfiltered attention counts">
-            <span><strong>{counts?.unassigned ?? "…"}</strong> need a firm</span><span><strong>{counts?.declined ?? "…"}</strong> declined by firm</span>
-          </div>}
-        </header>
+        </div>
         {countError && <div className="admin-local-error" role="alert">Attention counts couldn’t be updated. <button type="button" className="subtle-link" onClick={() => setCountAttempt((value) => value + 1)}>Try again</button></div>}
         {firmError && <div className="admin-local-error" role="alert">{firmError} <button type="button" className="subtle-link" onClick={() => setFirmAttempt((value) => value + 1)}>Reload firms</button></div>}
         <section className="admin-controls" aria-label={`${title} filters`}>
@@ -440,9 +455,13 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
               </span>
             </label><button className="button" type="submit" disabled={navigationLocked}>Search</button>
           </form>
+          <button className="button workdesk-filter-toggle" type="button" aria-expanded={filtersExpanded} aria-controls="admin-desk-filters" disabled={navigationLocked}
+            onClick={() => setFiltersExpanded(open => !open)}>Filters{(controls.firmId || controls.region || controls.category) && <span className="workdesk-filter-count">{Number(!!controls.firmId) + Number(!!controls.region) + Number(!!controls.category)}</span>}<span aria-hidden="true">{filtersExpanded ? "−" : "+"}</span></button>
+          <div className="workdesk-filter-reveal" data-open={filtersExpanded} inert={!filtersExpanded} id="admin-desk-filters"><div className="workdesk-filter-fields">
           <label className="field">Firm<select value={controls.firmId} disabled={navigationLocked || !!firmError} onChange={(event) => filter({ firmId: event.target.value })}><option value="">All firms</option>{firms.map((firm) => <option key={firm.id} value={firm.id}>{firm.name}</option>)}</select></label>
           <label className="field">Province<select value={controls.region} disabled={navigationLocked} onChange={(event) => filter({ region: event.target.value })}><option value="">All provinces</option>{regions.map((value) => <option key={value}>{value}</option>)}</select></label>
           <label className="field">Category<select value={controls.category} disabled={navigationLocked} onChange={(event) => filter({ category: event.target.value })}><option value="">All categories</option>{categories.map((value) => <option key={value}>{value}</option>)}</select></label>
+          </div></div>
         </section>
         <div className="admin-refinements">
           <div className="admin-filter-chips" aria-label="Active filters">{chips.map(({ key, label }) => <button type="button" key={key} disabled={navigationLocked} aria-label={`Remove ${label} filter`} onClick={() => filter({ [key]: "" })}>{label}<span aria-hidden="true">×</span></button>)}

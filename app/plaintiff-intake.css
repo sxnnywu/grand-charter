@@ -303,3 +303,29 @@
     margin-block: 8px;
   }
 }
+
+.plaintiff-confirmation { border-color: #e1dbcf; background: #fffdf7; }
+.plaintiff-confirmation-mark { width: 64px; height: 64px; border: 1px solid #cddccc; border-radius: 50%; background: #edf3e9; color: #38664a; }
+.plaintiff-confirmation h1 { font-size: clamp(36px, 5vw, 52px); }
+.plaintiff-confirmation > .button { border-radius: 24px; }
+.plaintiff-confirmation-next h2 { font: 400 25px/1.2 var(--display-font); }
+@media (prefers-reduced-motion: no-preference) {
+  .plaintiff-confirmation-mark { animation: submission-mark-arrive 750ms 80ms cubic-bezier(.2, .9, .25, 1.2) both; }
+  .plaintiff-confirmation-mark path { stroke-dasharray: 1; animation: submission-check-draw 500ms 350ms ease both; }
+  .plaintiff-confirmation-category { animation: submission-copy-arrive 600ms 130ms both; }
+  .plaintiff-confirmation h1 { animation: submission-copy-arrive 700ms 200ms both; }
+  .plaintiff-confirmation-summary { animation: submission-copy-arrive 700ms 290ms both; }
+  .plaintiff-confirmation-next { animation: submission-copy-arrive 750ms 370ms both; }
+  .plaintiff-confirmation > .button { animation: submission-copy-arrive 650ms 450ms both; }
+}
+@keyframes submission-mark-arrive { from { transform: scale(.55) rotate(-16deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes submission-check-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes submission-copy-arrive { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .plaintiff-confirmation *, .plaintiff-confirmation *::before, .plaintiff-confirmation *::after { animation: none !important; transition: none !important; }
+}
+
+.plaintiff-intake-actions > .button.primary { min-width: 170px; justify-content: center; }
+.intake-submit-spinner { display: inline-block; width: 16px; height: 16px; flex-shrink: 0; border: 1.5px solid #ffffff66; border-top-color: currentColor; border-radius: 50%; }
+@media (prefers-reduced-motion: no-preference) { .intake-submit-spinner { animation: intake-submit-spin 750ms linear infinite; } }
+@keyframes intake-submit-spin { to { transform: rotate(360deg); } }

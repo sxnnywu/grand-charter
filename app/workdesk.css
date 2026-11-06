@@ -1,0 +1,208 @@
+.workdesk {
+  --desk-paper: #fffdf7;
+  --desk-ground: #f4f2eb;
+  --desk-rule: #d9d5ca;
+  background: var(--desk-ground);
+}
+.workdesk .topbar { background: #faf9f5; }
+.workdesk .firm-topbar, .workdesk .admin-topbar { position: sticky; top: 0; z-index: 30; border-bottom: 1px solid var(--desk-rule); }
+.workdesk .firm-content, .workdesk .admin-main { width: min(100%, 1320px); padding: 34px 40px 70px; }
+.workdesk .firm-navigation { gap: 20px; padding: 0; border: 0; border-radius: 0; background: none; }
+.workdesk .firm-navigation button { min-height: 42px; padding: 9px 0; border-radius: 0; border-bottom: 2px solid transparent; font-size: 12px; }
+.workdesk .firm-navigation button[aria-current="page"] { background: none; border-bottom-color: var(--indigo); box-shadow: none; }
+.workdesk .admin-navigation { margin-top: -20px; margin-bottom: 35px; border-color: var(--desk-rule); }
+.workdesk .firm-page-heading, .workdesk .admin-page-heading {
+  display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, .75fr); align-items: center;
+  column-gap: clamp(36px, 6vw, 96px); margin: 0 0 42px; padding: 12px 0 0;
+}
+.workdesk .firm-page-heading .workdesk-eyebrow { margin: 0 0 20px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.workdesk .firm-page-heading h1, .workdesk .admin-page-heading h1 {
+  margin: 0; color: #242b35; font: 400 clamp(52px, 6vw, 80px)/1.06 var(--display-font); letter-spacing: -.045em; overflow-wrap: anywhere;
+}
+.workdesk-heading-word { display: inline-block; max-width: 100%; overflow: clip; vertical-align: bottom; }
+.workdesk-heading-word > span { display: inline-block; max-width: 100%; }
+.workdesk .firm-page-heading .workdesk-description { max-width: 43ch; margin-top: 20px; color: var(--muted); font-size: 14px; line-height: 1.75; }
+.workdesk-focus { position: relative; min-width: 0; padding: 25px 0 25px 30px; border-left: 1px solid var(--desk-rule); }
+.workdesk-focus-label { display: block; margin-bottom: 13px; color: var(--muted); font-size: 11px; }
+.workdesk .workdesk-focus .workdesk-focus-title { margin: 0; color: var(--ink); font: 400 clamp(26px, 2.6vw, 35px)/1.15 var(--display-font); letter-spacing: -.03em; overflow-wrap: anywhere; }
+.workdesk .workdesk-focus .workdesk-focus-copy { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin-top: 12px; color: var(--muted); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.workdesk .workdesk-primary { display: inline-flex; align-items: center; gap: 22px; min-height: 42px; margin-top: 21px; padding: 11px 17px; border: 1px solid #28333c; border-radius: 25px; background: #28333c; color: #fffdf7; font-size: 12px; font-weight: 500; }
+.workdesk .workdesk-primary > span { font-size: 18px; line-height: 1; }
+.workdesk .workdesk-primary:hover:not(:disabled) { background: #3c4a55; border-color: #3c4a55; }
+.workdesk-queue-counts { display: flex; gap: 28px; margin-top: 15px; }
+.workdesk-queue-counts button { display: flex; align-items: baseline; gap: 9px; padding: 5px 0; border: 0; border-bottom: 1px solid transparent; background: none; color: var(--muted); text-align: left; }
+.workdesk-queue-counts button[aria-pressed="true"] { color: var(--indigo); border-bottom-color: var(--indigo); }
+.workdesk-queue-counts strong { color: var(--ink); font: 400 29px/1 var(--display-font); }
+.workdesk-queue-counts span { font-size: 11px; }
+.workdesk-collection-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; padding: 19px 0; border-top: 1px solid var(--desk-rule); }
+.workdesk-collection-heading > div:first-child { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px 20px; }
+.workdesk .workdesk-collection-heading h2 { margin: 0; font: 400 27px/1.2 var(--display-font); letter-spacing: -.03em; }
+.workdesk-collection-heading > div > span { color: var(--muted); font-size: 11px; line-height: 1.6; }
+.workdesk .firm-layout-controls { gap: 0; padding: 3px; border-color: #ddd8cc; border-radius: 24px; background: none; }
+.workdesk .firm-layout-controls button { min-height: 32px; padding: 7px 13px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+.workdesk .firm-layout-controls button[aria-pressed="true"] { color: var(--ink); background: #e5e1d6; }
+.workdesk .firm-list-controls { margin-bottom: 12px; }
+.workdesk .firm-view-tabs { gap: 25px; margin-bottom: 18px; border-bottom: 0; }
+.workdesk .firm-view-tabs .staff-tab { padding: 7px 0 9px; font-size: 12px; font-weight: 500; }
+.workdesk .firm-filters, .workdesk .admin-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 0 20px; }
+.workdesk .firm-search, .workdesk .admin-search { max-width: 680px; align-items: end; }
+.workdesk .firm-search .field, .workdesk .admin-search .field { min-width: 0; font-size: 11px; }
+.workdesk :is(.firm-search, .admin-search) input { min-height: 42px; border-color: #d8d3c6; border-radius: 6px; background: var(--desk-paper); font-size: 12px; }
+.workdesk :is(.firm-search, .admin-search) > .button { min-height: 42px; border-radius: 6px; background: var(--desk-paper); font-size: 12px; }
+.workdesk .workdesk-filter-toggle { display: flex; gap: 12px; min-height: 42px; padding: 10px 16px; border: 1px solid #d8d3c6; border-radius: 6px; background: transparent; font-size: 12px; }
+.workdesk-filter-count { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #e1e4ef; color: var(--indigo); font-size: 10px; }
+.workdesk-filter-reveal { display: grid; grid-template-rows: 0fr; grid-column: 1 / -1; visibility: hidden; }
+.workdesk-filter-reveal[data-open="true"] { grid-template-rows: 1fr; visibility: visible; }
+.workdesk-filter-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; min-height: 0; overflow: hidden; }
+.workdesk-filter-reveal[data-open="true"] .workdesk-filter-fields { padding-top: 18px; padding-bottom: 6px; }
+.workdesk .workdesk-filter-fields .field { min-width: 0; font-size: 11px; }
+.workdesk .workdesk-filter-fields select { min-height: 42px; background-color: var(--desk-paper); font-size: 12px; }
+.workdesk .firm-active-filters:empty { min-height: 0; margin: 0; }
+.workdesk .firm-active-filters:not(:empty) { margin-top: 12px; }
+.workdesk .firm-filter-chip, .workdesk .admin-filter-chips > button:not(.subtle-link) { border: 0; border-radius: 20px; background: #e8e5db; color: var(--ink); }
+.workdesk .firm-list { max-height: none; border-top: 1px solid var(--desk-rule); }
+.workdesk .firm-list-scroll { overflow: visible; }
+.workdesk .firm-list-label { padding: 13px 0; border-color: var(--desk-rule); font-size: 11px; }
+.workdesk .firm-row { grid-template-columns: minmax(150px, 1fr) minmax(180px, 1.45fr) minmax(110px, .8fr) auto 115px 16px; gap: 20px; min-height: 113px; padding: 23px 12px; border-bottom-color: var(--desk-rule); }
+.workdesk .firm-row-title { font: 400 clamp(21px, 2.1vw, 27px)/1.2 var(--display-font); letter-spacing: -.025em; }
+.workdesk .firm-row-issue { color: #555f62; font-size: 13px; line-height: 1.65; }
+.workdesk .firm-row-context, .workdesk .firm-row time { font-size: 11px; line-height: 1.6; }
+.workdesk .firm-status-badge { padding: 0; border: 0; border-radius: 0; background: none; font-size: 11px; font-weight: 500; }
+.workdesk .firm-row.is-selected { background: #ece9df; box-shadow: inset 2px 0 var(--indigo); }
+.workdesk .firm-workspace-grid.is-empty .firm-empty { min-height: 260px; padding: 38px 0; border: 0; border-top: 1px solid var(--desk-rule); border-radius: 0; background: none; }
+.workdesk .firm-empty h2 { font-size: 37px; letter-spacing: -.035em; }
+.workdesk .firm-empty p { font-size: 14px; }
+.workdesk .firm-empty > .button { margin-top: 10px; border-radius: 22px; font-size: 12px; }
+.workdesk .admin-refinements { min-height: 56px; }
+.workdesk .admin-select-controls select { border: 0; background-color: transparent; font-size: 11px; }
+.workdesk .admin-collection { overflow: visible; border: 0; border-top: 1px solid var(--desk-rule); border-radius: 0; background: transparent; }
+.workdesk .admin-collection-summary { padding: 14px 0; border-color: var(--desk-rule); }
+.workdesk .admin-table th { padding: 14px 12px; border-color: var(--desk-rule); background: transparent; font-size: 10px; font-weight: 500; }
+.workdesk .admin-table td { padding: 22px 12px; border-color: var(--desk-rule); font-size: 12px; }
+.workdesk .admin-record-link { gap: 10px; }
+.workdesk .admin-record-link strong { font: 400 26px/1.15 var(--display-font); letter-spacing: -.025em; }
+.workdesk .admin-record-link > span { max-width: 40ch; color: #555f62; font-size: 12px; }
+.workdesk .admin-empty { min-height: 290px; padding: 38px 0; }
+.workdesk .admin-empty h2 { font-size: 35px; }
+.workdesk .admin-board-canvas { padding: 20px 0 0; }
+.workdesk .firm-case-board-columns { gap: 22px; }
+.workdesk .firm-case-column { border: 0; border-top: 2px solid #d1ccbf; border-radius: 0; background: none; }
+.workdesk .firm-case-column[data-status="in_progress"] { border-top-color: #7f8aaf; }
+.workdesk .firm-case-column[data-status="closed"] { border-top-color: #a8b0a3; }
+.workdesk .firm-case-column-heading { min-height: 72px; padding: 17px 0; border: 0; }
+.workdesk .firm-case-column-heading h2 { font-size: 28px; letter-spacing: -.025em; }
+.workdesk .firm-case-column-count { border-radius: 50%; background: #e5e1d6; }
+.workdesk .firm-case-column-scroll { padding: 0 1px 10px; background: none; }
+.workdesk .firm-case-column-update.has-feedback { background: var(--desk-ground); }
+.workdesk .firm-case-column-cards { gap: 14px; }
+.workdesk .firm-case-card { gap: 11px; min-height: 184px; padding: 22px; border: 1px solid #e2ddcf; border-radius: 5px; background: var(--desk-paper); box-shadow: 0 2px 2px #272a3403; }
+.workdesk .firm-case-card-heading strong { font: 400 26px/1.2 var(--display-font); letter-spacing: -.025em; }
+.workdesk .firm-case-card-issue { color: #555f62; font-size: 13px; }
+.workdesk .firm-case-column-message { padding: 30px 0; font-size: 12px; }
+.workdesk .firm-record-panel.is-drawer { width: min(780px, calc(100vw - 40px)); border-color: #ddd7ca; border-radius: 12px 0 0 12px; background: var(--desk-paper); box-shadow: -20px 0 70px #1f29251c; }
+.workdesk .firm-record-panel-backdrop { background: #252e354d; backdrop-filter: blur(3px); }
+.workdesk .firm-record-panel-chrome { align-items: start; gap: 20px; padding: 28px 30px 24px 36px; background: var(--desk-paper); }
+.workdesk .firm-record-panel-identity { gap: 13px; }
+.workdesk .firm-record-panel-identity h2 { font: 400 42px/1.07 var(--display-font); letter-spacing: -.04em; }
+.workdesk .firm-record-panel-identity > p { font-size: 11px; font-weight: 400; }
+.workdesk .firm-record-panel-close { border: 0; border-radius: 50%; background: #eeeae0; }
+.workdesk .firm-record, .workdesk .firm-record.is-in-panel { background: var(--desk-paper); }
+.workdesk .firm-record.is-in-panel .firm-record-header { gap: 14px; padding: 25px 36px; }
+.workdesk .firm-record-body, .workdesk .admin-record-detail { padding: 30px 36px; }
+.workdesk .firm-record-inquiry h3, .workdesk .admin-record-intake h3 { font-size: 27px; letter-spacing: -.025em; }
+.workdesk .firm-record-narrative, .workdesk .admin-record-description { margin-top: 15px; color: #4b555a; font-size: 14px; line-height: 1.9; }
+.workdesk .firm-record-details { border-color: var(--desk-rule); }
+.workdesk .firm-review-footer { padding: 24px 36px; border-color: var(--desk-rule); background: #f0ede4; }
+.workdesk .firm-review-actions .button, .workdesk .firm-record-outcome-actions .button { border-radius: 24px; }
+.workdesk .firm-record-outcome { padding: 26px; border: 0; border-radius: 6px; background: #eaf0e7; }
+.workdesk .admin-assignment { padding: 26px; border: 0; border-radius: 6px; background: #efede4; }
+.workdesk .admin-assignment-review { border: 0; background: var(--desk-paper); }
+.workdesk .admin-drawer-outcome { border-radius: 5px; background: #eaf0e7; }
+.workdesk .case-progress-current { padding-bottom: 15px; }
+@media (hover: hover) {
+  .workdesk .firm-row:hover:not(:disabled), .workdesk .admin-table tbody tr:hover { background: #eeebe2; }
+  .workdesk .firm-row:hover > svg { transform: translateX(4px); }
+  .workdesk .firm-case-card:hover:not(:disabled) { transform: translateY(-3px); border-color: #b9b09d; background: #fffdf7; box-shadow: 0 8px 20px #3e3b3009; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .workdesk-heading-word > span { animation: desk-title-arrive 800ms cubic-bezier(.22, 1, .36, 1) both; }
+  .workdesk-eyebrow { animation: desk-copy-arrive 600ms both; }
+  .workdesk-description { animation: desk-copy-arrive 700ms 130ms both; }
+  .workdesk-focus { animation: desk-focus-arrive 800ms 170ms cubic-bezier(.22, 1, .36, 1) both; }
+  .workdesk .firm-list, .workdesk .admin-collection { animation: desk-ledger-arrive 700ms 100ms cubic-bezier(.22, 1, .36, 1) both; }
+  .workdesk .firm-case-column { animation: desk-ledger-arrive 750ms cubic-bezier(.22, 1, .36, 1) both; }
+  .workdesk .firm-case-column:nth-child(2) { animation-delay: 70ms; }
+  .workdesk .firm-case-column:nth-child(3) { animation-delay: 140ms; }
+  .workdesk .firm-record-body > section:not(.firm-record-outcome), .workdesk .admin-record-detail > section { animation: desk-section-arrive 600ms 70ms cubic-bezier(.22, 1, .36, 1) both; }
+  .workdesk .firm-record-body > section:nth-child(2), .workdesk .admin-record-detail > section:nth-child(2) { animation-delay: 120ms; }
+  .workdesk .firm-record-body > section:nth-child(3), .workdesk .admin-record-detail > section:nth-child(3) { animation-delay: 180ms; }
+  .workdesk-filter-reveal { transition: grid-template-rows 350ms cubic-bezier(.22, 1, .36, 1), visibility 350ms; }
+  .workdesk-filter-fields { transition: padding 350ms cubic-bezier(.22, 1, .36, 1); }
+  .workdesk .firm-row > svg { transition: transform 220ms; }
+  .workdesk .workdesk-primary > span { transition: transform 220ms; }
+  .workdesk .workdesk-primary:hover:not(:disabled) > span { transform: translate(2px, -2px); }
+  .workdesk .firm-record-panel-close { transition: transform 200ms, background-color 200ms; }
+  .workdesk .firm-record-panel-close:hover:not(:disabled) { transform: rotate(8deg); }
+}
+@keyframes desk-title-arrive { from { transform: translateY(110%); } to { transform: none; } }
+@keyframes desk-copy-arrive { from { opacity: .2; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes desk-focus-arrive { from { opacity: .4; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+@keyframes desk-ledger-arrive { from { transform: translateY(22px); } to { transform: none; } }
+@keyframes desk-section-arrive { from { transform: translateY(18px); } to { transform: none; } }
+@media (max-width: 1100px) {
+  .workdesk .firm-row { grid-template-columns: minmax(0, 1fr) auto; gap: 9px 16px; padding-right: 38px; }
+  .workdesk .firm-row-heading { grid-column: 1; grid-row: 1; }
+  .workdesk .firm-row > .firm-status-badge { grid-column: 2; grid-row: 1; }
+  .workdesk .firm-row-issue { grid-column: 1 / -1; }
+  .workdesk .firm-row-context, .workdesk .firm-row > time { grid-column: 1; }
+  .workdesk .firm-row > svg { position: absolute; right: 10px; top: 26px; }
+  .workdesk .firm-page-heading, .workdesk .admin-page-heading { column-gap: 35px; grid-template-columns: minmax(0, 1fr) minmax(255px, .8fr); }
+}
+@media (max-width: 760px) {
+  .workdesk .firm-content, .workdesk .admin-main { padding: 24px 20px 50px; }
+  .workdesk .firm-page-heading, .workdesk .admin-page-heading { grid-template-columns: minmax(0, 1fr); gap: 25px; margin-bottom: 28px; padding-top: 0; }
+  .workdesk .firm-page-heading h1, .workdesk .admin-page-heading h1 { font-size: clamp(42px, 9vw, 60px); }
+  .workdesk .firm-page-heading .workdesk-eyebrow { margin-bottom: 13px; font-size: 11px; }
+  .workdesk .firm-page-heading .workdesk-description { max-width: 100%; margin-top: 13px; font-size: 13px; }
+  .workdesk-focus { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 15px; padding: 20px 0; border-left: 0; border-block: 1px solid var(--desk-rule); }
+  .workdesk-focus-label { grid-column: 1 / -1; margin-bottom: 10px; }
+  .workdesk .workdesk-focus .workdesk-focus-title { grid-column: 1 / -1; font-size: 29px; }
+  .workdesk .workdesk-focus .workdesk-focus-copy { grid-column: 1 / -1; margin-top: 10px; }
+  .workdesk .workdesk-primary { grid-column: 1 / -1; justify-self: start; margin-top: 16px; }
+  .workdesk-queue-counts { grid-column: 1 / -1; margin-top: 10px; gap: 30px; }
+  .workdesk .firm-workspace-name { display: none; }
+  .workdesk .firm-navigation { grid-row: 2; gap: 24px; margin: 0; }
+  .workdesk .firm-navigation button { flex: 0 1 auto; }
+  .workdesk .admin-navigation { margin-top: -15px; margin-bottom: 24px; gap: 20px; }
+  .workdesk .workdesk-collection-heading h2 { font-size: 25px; }
+  .workdesk-collection-heading { padding-top: 0; border-top: 0; }
+  .workdesk-collection-heading > div:first-child { gap: 7px; }
+  .workdesk-collection-heading > div > span { font-size: 11px; }
+  .workdesk .firm-filters, .workdesk .admin-controls { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .workdesk .workdesk-filter-toggle { justify-self: start; min-height: 36px; padding: 8px 13px; }
+  .workdesk .workdesk-filter-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .workdesk.admin-shell .workdesk-filter-fields > label:first-child { grid-column: 1 / -1; }
+  .workdesk .firm-search { grid-column: auto; }
+  .workdesk .firm-view-tabs { gap: 24px; }
+  .workdesk .firm-row { min-height: 145px; padding: 22px 30px 22px 0; }
+  .workdesk .firm-row-title { font-size: 26px; }
+  .workdesk .firm-row-issue { font-size: 13px; }
+  .workdesk .firm-row > .firm-status-badge { font-size: 10px; max-width: 120px; }
+  .workdesk .admin-table th, .workdesk .admin-table td { padding: 18px 8px; }
+  .workdesk .admin-record-link strong { font-size: 24px; }
+  .workdesk .admin-record-link > span { font-size: 12px; }
+  .workdesk .admin-record-link > small { font-size: 11px; }
+  .workdesk .firm-record-panel.is-drawer { width: 100%; border: 0; border-radius: 0; }
+  .workdesk .firm-record-panel-chrome { gap: 10px; padding: 24px 20px; }
+  .workdesk .firm-record-panel-identity h2 { font-size: 34px; }
+  .workdesk .firm-record-panel-actions { gap: 2px; }
+  .workdesk .firm-record-panel-navigation .button { width: 29px; min-height: 32px; }
+  .workdesk .firm-record-panel-close { width: 32px; height: 32px; }
+  .workdesk .firm-record.is-in-panel .firm-record-header, .workdesk .firm-record-body, .workdesk .admin-record-detail { padding: 24px 20px; }
+  .workdesk .firm-record-inquiry h3, .workdesk .admin-record-intake h3 { font-size: 25px; }
+  .workdesk .firm-review-footer { padding: 22px 20px; }
+  .workdesk .admin-assignment { padding: 22px 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workdesk *, .workdesk *::before, .workdesk *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

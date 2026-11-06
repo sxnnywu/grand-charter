@@ -2,7 +2,7 @@ import { flushSync } from "react-dom";
 
 let activeAnimations: Animation[] = [];
 let revision = 0;
-type WorkspaceTransitionScope = "page" | "detail" | "session" | "drawer" | "record" | "collection";
+type WorkspaceTransitionScope = "page" | "detail" | "session" | "drawer" | "record" | "collection" | "submission";
 const motionPreference = "(prefers-reduced-motion: no-preference)";
 
 export function stopWorkspaceTransition() {
@@ -44,9 +44,13 @@ export async function animateWorkspace(scope: WorkspaceTransitionScope, update: 
     return;
   }
 
-  if (motion && scope === "page" && document.querySelector(".plaintiff-shell")) {
+  if (motion && (scope === "page" || scope === "submission") && document.querySelector(".plaintiff-shell")) {
     const departure = document.querySelector<HTMLElement>(leavingIntake ? ".plaintiff-intake" : ".plaintiff-request-navigator, .plaintiff-home-start");
-    animate(departure, [{ transform: "translateY(0)", opacity: 1 },
+    if (scope === "submission") {
+      document.documentElement.dataset.workspaceTransition = scope;
+      animate(departure, [{ transform: "none", opacity: 1 },
+        { transform: "translateY(-22px) scale(.975)", opacity: 0 }], 240);
+    } else animate(departure, [{ transform: "translateY(0)", opacity: 1 },
       { transform: `translateY(${leavingIntake ? 18 : -18}px)`, opacity: 0 }], 170);
     await Promise.all(activeAnimations.map(animation => animation.finished.catch(() => {})));
     if (current !== revision) return;
@@ -65,6 +69,11 @@ export async function animateWorkspace(scope: WorkspaceTransitionScope, update: 
       animate(nextPanel, [{ transform: "translateX(100%)" }, { transform: "translateX(0)" }]);
       animate(document.querySelector(".firm-record-panel-backdrop"), [{ opacity: 0 }, { opacity: 1 }], 260);
     }
+  } else if (scope === "submission") {
+    animate(document.querySelector(".plaintiff-confirmation"), [
+      { transform: "translateY(28px) scale(.97)", opacity: .5, transformOrigin: "center top" },
+      { transform: "none", opacity: 1, transformOrigin: "center top" },
+    ], 700);
   } else if (scope === "page" && document.querySelector(".plaintiff-intake")) {
     animate(document.querySelector(".plaintiff-intake-layout"), [
       { transform: "translateX(24px) scale(.985)", transformOrigin: "left top" },

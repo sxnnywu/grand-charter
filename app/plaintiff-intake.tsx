@@ -191,8 +191,8 @@ export function PlaintiffIntake({ draft, hasDraft, updateDraft, discardDraft, su
         <div className="plaintiff-intake-actions">
           <button className="subtle-link" type="button" onClick={() => discardDialog.current?.showModal()}
             disabled={submitting || !hasDraft}>Discard draft</button>
-          <button className="button primary" type="submit" disabled={submitting}>
-            {submitting ? "Submitting…" : "Submit request"}<Arrow />
+          <button className="button primary" type="submit" disabled={submitting} aria-busy={submitting}>
+            {submitting ? "Submitting…" : "Submit request"}{submitting ? <span className="intake-submit-spinner" aria-hidden="true" /> : <Arrow />}
           </button>
         </div>
       </form>
@@ -232,7 +232,7 @@ export function RequestSubmitted({ lead, onView }: { lead: SubmittedRequestSumma
     aria-labelledby="plaintiff-confirmation-heading">
     <span className="plaintiff-confirmation-mark" aria-hidden="true">
       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round"><path d="m5 12 4 4L19 6" /></svg>
+        strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round"><path pathLength="1" d="m5 12 4 4L19 6" /></svg>
     </span>
     <p className="plaintiff-confirmation-category">{lead.category}</p>
     <h1 id="plaintiff-confirmation-heading" tabIndex={-1} ref={focusHeading}>Request submitted</h1>
