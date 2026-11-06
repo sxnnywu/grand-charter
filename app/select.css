@@ -1,0 +1,148 @@
+@supports (appearance: base-select) {
+  :root .workspace-session select,
+  :root .workspace-session select::picker(select) {
+    appearance: base-select;
+  }
+
+  :root .workspace-session select {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    padding: 9px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    color: var(--ink);
+    background: var(--paper);
+    background-image: none;
+    font: inherit;
+    font-weight: 400;
+    text-align: left;
+    white-space: nowrap;
+    cursor: pointer;
+    anchor-name: --brief-select;
+    anchor-scope: --brief-select;
+  }
+
+  :root .workspace-session select:open {
+    border-color: var(--indigo);
+    box-shadow: 0 0 0 2px #35477e12;
+  }
+
+  :root .workspace-session select:disabled {
+    opacity: .55;
+    cursor: default;
+  }
+
+  :root .workspace-session select::picker-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    margin-inline-start: auto;
+    color: var(--muted);
+    background: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+    content: "";
+  }
+
+  :root .workspace-session select:open::picker-icon {
+    rotate: 180deg;
+  }
+
+  :root .workspace-session select::picker(select) {
+    inset: auto;
+    position-area: none;
+    position-anchor: --brief-select;
+    top: anchor(bottom);
+    left: anchor(left);
+    position-try-fallbacks: flip-block, flip-inline;
+    position-try-order: normal;
+    box-sizing: border-box;
+    width: anchor-size(width);
+    max-width: calc(100vw - 24px);
+    max-height: min(340px, 45dvh);
+    margin-block: 6px;
+    padding: 5px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    color: var(--ink);
+    background: var(--paper);
+    box-shadow: 0 12px 32px #2026381c, 0 2px 6px #20263808;
+    font: 400 13px/1.5 var(--font-geist), sans-serif;
+  }
+
+  :root .workspace-session select option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    padding: 9px 11px;
+    border-radius: 5px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+  }
+
+  :root .workspace-session select option:checked {
+    color: var(--indigo);
+    background: var(--indigo-pale);
+    font-weight: 600;
+  }
+
+  :root .workspace-session select option:is(:hover, :focus-visible):not(:disabled) {
+    background: #f0f2f8;
+    outline: none;
+  }
+
+  :root .workspace-session select option:checked:is(:hover, :focus-visible) {
+    background: var(--indigo-pale);
+  }
+
+  :root .workspace-session select option:focus-visible {
+    outline: 2px solid var(--indigo);
+    outline-offset: -2px;
+  }
+
+  :root .workspace-session select option:disabled {
+    color: var(--muted);
+    opacity: .5;
+    cursor: default;
+  }
+
+  :root .workspace-session select option:disabled[value=""] {
+    display: none;
+  }
+
+  :root .workspace-session select option::checkmark {
+    order: 1;
+    margin-inline-start: auto;
+    color: var(--indigo);
+    content: "✓";
+  }
+
+  :root .workspace-session :is(.firm-select, .admin-firm-select) > svg {
+    display: none;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    :root .workspace-session select {
+      transition: border-color 140ms ease, box-shadow 140ms ease;
+    }
+
+    :root .workspace-session select::picker-icon {
+      transition: rotate 140ms ease;
+    }
+
+    :root .workspace-session select::picker(select) {
+      animation: brief-select-enter 140ms cubic-bezier(.2, .75, .3, 1);
+    }
+  }
+}
+
+@keyframes brief-select-enter {
+  from { transform: translateY(-4px); }
+  to { transform: translateY(0); }
+}

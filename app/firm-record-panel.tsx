@@ -57,6 +57,7 @@ export function FirmRecordPanel({ drawer, label, busy, onClose, identity, naviga
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (nestedDialogOpen()) return;
+      if (CSS.supports("selector(select:open)") && element.querySelector("select:open")) return;
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
