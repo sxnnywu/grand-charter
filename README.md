@@ -32,4 +32,19 @@ Open [Brief](http://127.0.0.1:3000). Choose an account. Each account uses the pa
 | Luc Moreau (`luc@example.com`) | Laurent Legal attorney | Review Quebec work, including a transferred case. |
 | Morgan Ellis (`morgan@example.com`) | Admin | Search records, manage assignments, and inspect history. |
 
+## Request routing
+
+New requests are routed by province and category using this mapping:
+
+| Province | Employment | Housing | Personal injury | Contract dispute |
+| --- | --- | --- | --- | --- |
+| Ontario | Northline Legal | Harbour Law | Harbour Law | Northline Legal |
+| British Columbia | Cedar Legal | Cedar Legal | Pacific Counsel | Pacific Counsel |
+| Alberta | Prairie Legal | Prairie Legal | Prairie Legal | Unassigned |
+| Quebec | Laurent Legal | Laurent Legal | Laurent Legal | Laurent Legal |
+
+Unmatched requests wait for an admin to assign a firm. Alberta contract disputes are intentionally unmapped so this workflow can be explored.
+
+The mapping is defined in [db/workspace-data.mjs](db/workspace-data.mjs) and seeded into the `routing_rules` table. Request creation looks up that table in [server/leads.ts](server/leads.ts). Rerunning the seed adds missing rules but does not overwrite existing mappings.
+
 Run `npm run typecheck` or `npm run build` to check the app. Stop the database with `docker compose stop db`.
