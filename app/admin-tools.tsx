@@ -143,7 +143,7 @@ export function AdminAssignmentActions({ lead, caseView = false, firms, locked =
           </option>)}
         </select><svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg></span>
       </label>
-      {validSelection && selectedFirm && <div className="admin-assignment-review" aria-label="Review assignment">
+      {validSelection && selectedFirm && <div className="admin-assignment-review" key={targetFirm} aria-label="Review assignment">
         <p className="admin-assignment-transfer"><span>{currentFirm}</span><span aria-hidden="true">→</span><span className="visually-hidden">to</span><strong>{selectedFirm.name}</strong></p>
         <ul>
           {caseView ? <>
@@ -192,6 +192,8 @@ export function AdminHistory({ leadId, locked = false, onAccessLost, refreshVers
   onAccessLost?: () => void;
   refreshVersion?: number;
 }) {
+  const knownEvents = useRef<{ leadId: string; ids: Set<string> } | undefined>(undefined);
+  const [newEvents, setNewEvents] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState<{ leadId: string; events: AuditEvent[] }>();
   const [failure, setFailure] = useState<{ leadId: string; message: string }>();
   const [attempt, setAttempt] = useState(0);
@@ -211,6 +213,9 @@ export function AdminHistory({ leadId, locked = false, onAccessLost, refreshVers
     request<{ events: AuditEvent[] }>(`/api/leads/${leadId}/history`, { signal: controller.signal })
       .then(({ events }) => {
         if (controller.signal.aborted) return;
+        const previous = knownEvents.current;
+        setNewEvents(new Set(previous?.leadId === leadId ? events.filter(event => !previous.ids.has(event.id)).map(event => event.id) : []));
+        knownEvents.current = { leadId, ids: new Set(events.map(event => event.id)) };
         setLoaded({ leadId, events: [...events].sort((first, second) => Date.parse(second.createdAt) - Date.parse(first.createdAt) || second.id.localeCompare(first.id)) });
       })
       .catch((error: unknown) => {
@@ -233,7 +238,7 @@ export function AdminHistory({ leadId, locked = false, onAccessLost, refreshVers
     </div>}
     {!events ? !error && <p className="detail-copy" role="status">Loading history…</p> : events.length ? <>
       <ol id={`admin-history-${leadId}`}>
-        {visible.map((event) => <li key={event.id}>
+        {visible.map((event) => <li key={event.id} data-new-event={newEvents.has(event.id) || undefined}>
           <p className="admin-history-event"><strong>{event.actorName}</strong> {eventDescription(event)}</p>
           {eventChanges(event).map((change) => <p className="admin-history-change" key={change.label}>
             <span>{change.label}</span> {change.from && <>{change.from}<span aria-hidden="true"> → </span><span className="visually-hidden"> to </span></>}{change.to}

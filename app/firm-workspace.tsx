@@ -262,10 +262,12 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
       const needsCollection = changesCollection && !cached;
       const version = changesCollection ? listAttempt + 1 : listAttempt;
       if (!needsCollection && !changesRecord) {
-        arrivalPage.current = undefined;
-        if (!targetBoard) setPage(settledPages.current.get(targetPath));
-        setListAttempt((value) => Math.max(value, version));
-        applyLocation(next);
+        animateWorkspace(scope, () => {
+          arrivalPage.current = undefined;
+          if (!targetBoard) setPage(settledPages.current.get(targetPath));
+          setListAttempt((value) => Math.max(value, version));
+          applyLocation(next);
+        });
         return;
       }
       setPendingCollection(changesCollection ? next : undefined);
@@ -760,7 +762,7 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
                 {items.map((item) => <button className={`firm-row${location.leadId === item.id ? " is-selected" : ""}`} type="button" key={item.id}
                   data-record-id={item.id} disabled={navigationLocked} aria-pressed={location.leadId === item.id} onClick={() => select(item)}>
                   <span className="firm-row-heading"><span className="firm-row-title">{item.name}</span></span>
-                  <span className="firm-row-issue">{firmIssueExcerpt(item.description, 110)}</span>
+                  <span className="firm-row-issue">{firmIssueExcerpt(item.title || item.description, 110)}</span>
                   <span className="firm-row-context">{item.category} · {item.region}</span>
                   <FirmStatusBadge status={location.view === "cases" ? item.caseStatus ?? "open" : item.status} />
                   <time dateTime={item.createdAt}>Submitted {dateFormat.format(new Date(item.createdAt))}</time>

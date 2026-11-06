@@ -6,7 +6,7 @@ import { idempotent, requestHash } from "./idempotency";
 import type { User } from "./session";
 
 const leadColumns = `
-  l.id, l.name, l.email, l.category, l.region, l.description, l.status,
+  l.id, l.name, l.email, l.title, l.category, l.region, l.description, l.status,
   l.created_at AS "createdAt", c.id AS "caseId", c.status AS "caseStatus",
   l.firm_id AS "firmId", f.name AS "firmName"
 `;
@@ -50,6 +50,20 @@ async function listRecords(user: User, params: URLSearchParams, casesOnly: boole
   if (status) clauses.push(`${casesOnly ? "c" : "l"}.status = ${parameter(status)}`);
   if (region) clauses.push(`l.region = ${parameter(region)}`);
   if (category) clauses.push(`l.category = ${parameter(category)}`);
+  if (user.role === "plaintiff") {
+    const kind = params.get("requestKind");
+    if (kind && !["all", "requests", "cases"].includes(kind)) {
+      throw new RequestError(400, "Choose all matters, requests, or cases.");
+    }
+    if (kind === "requests") clauses.push("c.id IS NULL");
+    if (kind === "cases") clauses.push("c.id IS NOT NULL");
+    const requestState = params.get("requestState");
+    if (requestState && requestState !== "all" && requestState !== "active" && requestState !== "closed") {
+      throw new RequestError(400, "Choose all, active, or closed requests.");
+    }
+    if (requestState === "active") clauses.push("l.status <> 'closed' AND (c.id IS NULL OR c.status <> 'closed')");
+    if (requestState === "closed") clauses.push("(l.status = 'closed' OR c.status = 'closed')");
+  }
   if (before && !isUuid(before)) throw new RequestError(400, "Invalid page cursor.");
 
   if (user.role === "admin") {
@@ -167,8 +181,10 @@ export async function submitLead(user: User, body: Record<string, unknown>, key:
     });
   }
   const description = requiredText(body.description, "description", 2_500, "description");
+  const title = body.title === undefined || body.title === null || body.title === "" ? null
+    : typeof body.title === "string" && !body.title.trim() ? null : requiredText(body.title, "request name", 80, "title");
 
-  const hash = requestHash({ name, email, category, region, description });
+  const hash = requestHash({ name, email, category, region, description, ...(title ? { title } : {}) });
   return transaction((client) => idempotent(client, user.id, "lead.create", key, hash, async () => {
     const route = await client.query<{ firm_id: string }>(
       "SELECT firm_id FROM routing_rules WHERE category = $1 AND region = $2",
@@ -177,9 +193,9 @@ export async function submitLead(user: User, body: Record<string, unknown>, key:
     const firmId = route.rows[0]?.firm_id ?? null;
     const status = firmId ? "awaiting_firm_review" : "pending_assignment";
     const { rows } = await client.query<{ id: string }>(
-      `INSERT INTO leads (plaintiff_id, name, email, category, region, description, status, firm_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-      [user.id, name, email, category, region, description, status, firmId],
+      `INSERT INTO leads (plaintiff_id, name, email, category, region, description, status, firm_id, title)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [user.id, name, email, category, region, description, status, firmId, title],
     );
     const leadId = rows[0].id;
     if (firmId) {

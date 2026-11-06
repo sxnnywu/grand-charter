@@ -1,0 +1,18 @@
+.issue-select { position: relative; min-width: 0; }
+.issue-select-control { position: relative; }
+.issue-select-control > input { width: 100%; min-height: 43px; padding-right: 42px; }
+.issue-select-control > button { position: absolute; inset: 1px 1px 1px auto; display: grid; width: 38px; place-items: center; border: 0; border-radius: 5px; background: transparent; color: var(--muted); }
+.issue-select-control > button svg { transition: transform 200ms ease; }
+.issue-select[data-open] .issue-select-control > button svg { transform: rotate(180deg); }
+.issue-select[data-open] .issue-select-control > input { border-color: var(--indigo); }
+.issue-select-options { position: absolute; inset: calc(100% + 7px) 0 auto; z-index: 35; max-height: min(280px, 42dvh); margin: 0; padding: 5px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); box-shadow: 0 12px 28px #20263816; list-style: none; visibility: hidden; opacity: 0; transform: translateY(-6px); pointer-events: none; }
+.issue-select[data-open] .issue-select-options { visibility: visible; opacity: 1; transform: none; pointer-events: auto; }
+.issue-select-options [role="option"] { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 10px 12px; border-radius: 5px; cursor: pointer; }
+.issue-select-options [role="option"][data-active="true"] { background: #efeee8; }
+.issue-select-options [role="option"][aria-selected="true"] { color: var(--indigo); }
+.issue-select-options strong { display: block; font-size: 13px; font-weight: 500; }
+.issue-select-options [role="option"] div > span { display: block; margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 400; line-height: 1.45; }
+.issue-select-check { margin-left: auto; font-size: 13px; }
+.issue-select-empty { padding: 16px 12px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+@media (prefers-reduced-motion: no-preference) { .issue-select-options { transition: opacity 160ms ease, transform 200ms cubic-bezier(.22, 1, .36, 1), visibility 160ms; } }
+@media (prefers-reduced-motion: reduce) { .issue-select-control > button svg { transition: none; } }

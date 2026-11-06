@@ -1,92 +1,158 @@
 .plaintiff-record {
   min-width: 0;
-  border: 1px solid var(--line);
   border-radius: 12px;
-  background: var(--paper);
+  background: #fffdf7;
 }
 
 .plaintiff-record-header {
   display: grid;
-  gap: 22px;
-  padding: 25px clamp(20px, 3vw, 32px) 24px;
-  border-bottom: 1px solid var(--line);
+  grid-template-columns: minmax(0, 1fr) minmax(180px, .4fr);
+  gap: 28px;
+  padding: 32px clamp(24px, 4vw, 48px) 36px;
 }
 
-.plaintiff-record-header > .subtle-link {
-  justify-self: start;
+.plaintiff-file-topline,
+.plaintiff-file-meta,
+.plaintiff-correspondence-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plaintiff-file-topline {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.plaintiff-file-topline .subtle-link {
   font-size: 12px;
+  font-weight: 500;
 }
 
 .plaintiff-record-heading h2 {
-  display: -webkit-box;
-  overflow: hidden;
+  margin: 10px 0 14px;
   color: var(--ink);
-  font: 500 clamp(27px, 3vw, 35px)/1.15 var(--display-font);
-  letter-spacing: -.035em;
+  font: 500 clamp(28px, 3.5vw, 48px)/1.12 var(--display-font);
+  letter-spacing: -.04em;
   overflow-wrap: anywhere;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
 }
 
-.plaintiff-record-heading > p:not(.plaintiff-case-label) {
-  margin-top: 8px;
+.plaintiff-file-category,
+.plaintiff-file-section-label {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.plaintiff-record-heading .plaintiff-file-preview {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: 54ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.plaintiff-file-meta {
+  display: grid;
+  align-content: end;
+  gap: 12px;
+  align-self: end;
+  padding: 0 0 0 24px;
+  border-left: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .plaintiff-record-body {
-  padding: 24px clamp(20px, 3vw, 32px) 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 28px clamp(24px, 4vw, 48px);
+  padding: 0 clamp(24px, 4vw, 48px) 36px;
 }
 
+.plaintiff-situation-column { min-width: 0; }
+.plaintiff-title-word { display: inline-block; max-width: 100%; overflow: clip; vertical-align: top; }
+.plaintiff-title-word > span { display: inline-block; max-width: 100%; overflow-wrap: anywhere; }
+
 .plaintiff-record-status {
+  position: relative;
   display: grid;
   justify-items: start;
-  gap: 12px;
-  padding-bottom: 24px;
+  gap: 10px;
+  min-height: 220px;
+  align-content: center;
+  gap: 18px;
+  padding: 30px;
+  border-radius: 9px;
+  background: #28333c;
+  color: #fffdf7;
+}
+
+.plaintiff-record-status::before {
+  content: none;
 }
 
 .plaintiff-record-status h3 {
   max-width: 38ch;
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.45;
-  letter-spacing: -.02em;
+  font-family: var(--display-font);
+  font-size: clamp(21px, 2.2vw, 29px);
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: -.025em;
 }
 
-.plaintiff-record-status > p {
-  max-width: 48ch;
+.plaintiff-record-status > p,
+.plaintiff-case-message {
+  max-width: 49ch;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.65;
 }
 
-.plaintiff-record-actions {
-  margin-top: 3px;
-}
+.plaintiff-record-status > p,
+.plaintiff-case-summary .plaintiff-case-message { color: #c6d0d4; }
+.plaintiff-record-status .plaintiff-file-section-label,
+.plaintiff-case-summary .plaintiff-file-section-label { color: #aebfc4; }
+
+.plaintiff-record-actions { margin-top: 4px; }
 
 .plaintiff-record-updates {
   display: grid;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 16px;
+  margin: 18px 0 0;
 }
 
 .plaintiff-record-update {
+  position: relative;
   display: grid;
-  gap: 7px;
-  padding: 15px 17px;
-  border-left: 2px solid var(--indigo);
-  background: #f2f3f8;
+  gap: 12px;
+  padding: 21px 24px;
+  border: 1px solid #ded8c9;
+  border-radius: 2px;
+  background: #f7f3e9;
+  box-shadow: 0 2px 1px #48402b05;
 }
 
-.plaintiff-record-update h3 {
-  font-size: 13px;
-  font-weight: 650;
+.plaintiff-correspondence-heading h3 {
+  font-size: 11px;
+  font-weight: 500;
+  color: #70634b;
 }
 
+.plaintiff-correspondence-heading > span { color: #948367; }
 .plaintiff-record-update p {
+  max-width: 54ch;
   overflow-wrap: anywhere;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
 .plaintiff-record-update time {
@@ -100,141 +166,146 @@
   cursor: pointer;
 }
 
-.plaintiff-record-earlier .plaintiff-record-update {
-  margin-top: 12px;
-}
+.plaintiff-record-earlier .plaintiff-record-update { margin-top: 14px; }
 
 .plaintiff-record-documents {
-  padding-top: 24px;
-  border-top: 1px solid var(--line);
-  scroll-margin-top: 100px;
+  padding: 10px 0 0;
+  border-top: 0;
+  scroll-margin-top: 310px;
 }
 
-.plaintiff-record-documents > .detail-section {
-  margin-top: 0;
+.plaintiff-record-documents > .detail-section { margin-top: 0; }
+.plaintiff-record p.detail-empty {
+  padding: 6px 0;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
 }
+
+.plaintiff-record .case-tool h3 { font-size: 14px; font-weight: 550; }
+.plaintiff-record .detail-copy { font-size: 12px; }
+.plaintiff-record .file-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+}
+
+.plaintiff-record .file-row {
+  position: relative;
+  display: flex;
+  align-items: start;
+  gap: 11px;
+  min-width: 0;
+  margin: 0;
+  padding: 16px 14px;
+  border: 1px solid #e3dfd4;
+  border-radius: 3px;
+  background: #fffefa;
+  box-shadow: 0 2px 0 #e9e4d866;
+}
+
+.plaintiff-record .document-icon {
+  width: 28px;
+  height: 32px;
+  color: var(--indigo);
+  background: transparent;
+}
+
+.plaintiff-record .case-file-copy .subtle-link { font-size: 12px; font-weight: 500; }
+.plaintiff-record .case-file-copy small { margin-top: 8px; font-size: 10px; line-height: 1.6; }
+.plaintiff-record .case-upload-prompt { margin-top: 8px; }
+.plaintiff-record .case-upload-prompt .button { border-color: #bbb5a6; background: transparent; }
 
 .plaintiff-record-documents:focus,
-.plaintiff-case-content:focus {
-  outline: none;
-}
+.plaintiff-case-content:focus { outline: none; }
 
 .plaintiff-record-details {
-  margin-top: 28px;
-  padding-top: 20px;
+  grid-column: 1 / -1;
+  margin-top: 0;
+  padding-top: 18px;
   border-top: 1px solid var(--line);
 }
 
 .plaintiff-record-details > summary {
   width: fit-content;
   color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
 }
 
-.plaintiff-record-details-content {
-  display: grid;
-  gap: 22px;
-  padding-top: 18px;
-}
-
-.plaintiff-record-description {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font-size: 14px;
-  line-height: 1.75;
-}
-
+.plaintiff-record-details-content { display: grid; gap: 24px; padding-top: 22px; }
+.plaintiff-record-description { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.8; }
 .plaintiff-record-metadata {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 15px 20px;
+  gap: 16px 24px;
   margin: 0;
 }
 
-.plaintiff-record-metadata dt {
-  margin-bottom: 3px;
-  color: var(--muted);
-  font-size: 11px;
-}
+.plaintiff-record-metadata dt { margin-bottom: 4px; color: var(--muted); font-size: 11px; }
+.plaintiff-record-metadata dd { margin: 0; font-size: 12px; overflow-wrap: anywhere; }
+.plaintiff-record-reference { grid-column: 1 / -1; }
 
-.plaintiff-record-metadata dd {
-  margin: 0;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
+.plaintiff-case-summary { display: grid; justify-items: start; align-content: center; min-height: 240px; gap: 18px; padding: 30px; border-radius: 9px; background: #28333c; color: #fffdf7; }
+.plaintiff-case-status-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; }
+.plaintiff-case-status-heading .plaintiff-status { color: #fffdf7; font-size: clamp(24px, 2.4vw, 32px); font-weight: 500; }
+.plaintiff-case-summary .subtle-link { color: #d5e3e6; }
+.plaintiff-case-documents { min-height: 32px; font-size: 12px; }
+.plaintiff-case-content > .case-tool { margin-top: 0; }
+.plaintiff-case-content .case-progress { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.plaintiff-case-content .progress-step { display: block; padding-top: 10px; border-top: 2px solid var(--line); font-size: 11px; }
+.plaintiff-case-content .progress-step.is-current { border-top-color: var(--indigo); font-weight: 500; }
+.plaintiff-case-content .progress-step.is-complete { border-top-color: #6b9a83; }
+.plaintiff-case-content .progress-marker, .plaintiff-case-content .progress-step::after { display: none; }
+.plaintiff-case-content .case-content { margin-top: 25px; padding-top: 24px; }
+.plaintiff-case-content [id$="-documents-panel"] { scroll-margin-top: 310px; }
+.plaintiff-record-loading { padding: 24px 0; color: var(--muted); font-size: 13px; }
 
-.plaintiff-record-reference {
-  grid-column: 1 / -1;
-}
-
-.plaintiff-case-summary {
+.plaintiff-record-pending {
   display: grid;
+  align-content: start;
   justify-items: start;
-  gap: 10px;
-}
-
-.plaintiff-case-status-heading {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-}
-
-.plaintiff-case-firm {
+  gap: 32px;
+  min-height: 420px;
+  padding: 30px clamp(24px, 4vw, 48px);
   color: var(--muted);
   font-size: 13px;
-  font-weight: 600;
 }
 
-.plaintiff-case-message {
-  max-width: 46ch;
-  color: var(--muted);
-  font-size: 13px;
-  line-height: 1.6;
+@supports (interpolate-size: allow-keywords) {
+  @media (prefers-reduced-motion: no-preference) {
+    .plaintiff-record details { interpolate-size: allow-keywords; }
+    .plaintiff-record details::details-content {
+      height: 0;
+      overflow: clip;
+      transition: height 260ms cubic-bezier(.22, 1, .36, 1), content-visibility 260ms allow-discrete;
+    }
+    .plaintiff-record details[open]::details-content { height: auto; }
+  }
 }
 
-.plaintiff-case-documents {
-  min-height: 32px;
-  font-size: 12px;
+@media (prefers-reduced-motion: no-preference) {
+  .plaintiff-record .file-row { animation: file-attachment-arrive 300ms cubic-bezier(.22, 1, .36, 1); }
+  .plaintiff-record .file-row:hover { border-color: #aaa18e; box-shadow: 0 3px 8px #48402b0a; }
+  .plaintiff-record .file-row { transition: border-color 180ms ease, box-shadow 180ms ease; }
 }
 
-.plaintiff-case-content > .case-tool {
-  margin-top: 0;
-}
-
-.plaintiff-case-content .case-content {
-  margin-top: 25px;
-  padding-top: 24px;
-}
-
-.plaintiff-case-content [id$="-documents-panel"] {
-  scroll-margin-top: 100px;
-}
-
-.plaintiff-record-loading {
-  padding: 8px 0;
-  color: var(--muted);
-  font-size: 13px;
+@keyframes file-attachment-arrive {
+  from { transform: translateY(6px); }
+  to { transform: translateY(0); }
 }
 
 @media (max-width: 760px) {
-  .plaintiff-record {
-    border-radius: 0;
-    border-inline: 0;
-  }
-
-  .plaintiff-record-header {
-    gap: 15px;
-    padding: 18px 20px;
-  }
-
-  .plaintiff-record-body {
-    padding: 22px 20px 28px;
-  }
-
-  .plaintiff-record-status h3 {
-    font-size: 19px;
-  }
+  .plaintiff-record-header { grid-template-columns: 1fr; gap: 24px; padding: 24px 23px 22px; }
+  .plaintiff-record-body { grid-template-columns: 1fr; padding: 0 23px 30px; }
+  .plaintiff-file-meta { display: flex; flex-wrap: wrap; padding: 0; border: 0; }
+  .plaintiff-record-status, .plaintiff-case-summary { min-height: 210px; padding: 25px; }
+  .plaintiff-record-heading h2 { font-size: clamp(27px, 7vw, 34px); }
+  .plaintiff-file-topline { font-size: 10px; }
+  .plaintiff-file-meta { gap: 8px; font-size: 10px; }
+  .plaintiff-record-status h3 { font-size: 19px; }
+  .plaintiff-record-update { padding: 19px; }
 }
+
+.plaintiff-case-status-heading .plaintiff-status { font-family: var(--display-font); font-size: clamp(25px, 3vw, 32px); font-weight: 400; }

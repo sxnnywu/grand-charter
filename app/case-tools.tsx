@@ -495,7 +495,7 @@ export function CaseTools({ caseId, leadId, status, role, onStatusChange, onBusy
       <section className={`detail-section case-tool${staff ? " case-progress-compact" : ""}`} aria-label="Case progress">
         {staff ? <div className="case-progress-current">
           <h3>Progress</h3>
-          <span className="case-progress-status">{stages[currentStage].label}</span>
+          <span key={status} className="case-progress-status">{stages[currentStage].label}</span>
         </div> : <>
           {role !== "plaintiff" && <div><h3>Case progress</h3><p className="detail-copy">{statusCopy[status]}</p></div>}
           <ol className="case-progress">

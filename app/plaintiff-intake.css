@@ -8,8 +8,13 @@
 }
 
 .plaintiff-intake-heading h1 {
-  font-size: clamp(31px, 4vw, 40px);
+  overflow: clip;
+  font-size: clamp(36px, 4vw, 50px);
+  font-weight: 400;
+  letter-spacing: -.035em;
 }
+
+.plaintiff-intake-heading h1 > span { display: inline-block; }
 
 .plaintiff-intake-layout {
   display: grid;
@@ -68,6 +73,11 @@
   line-height: 1.45;
 }
 
+.plaintiff-intake-form .field > label { transition: color 180ms ease; }
+.plaintiff-intake-form .field:focus-within > label { color: var(--indigo); }
+.plaintiff-intake-form :is(input:not([type="hidden"]), textarea) { transition: border-color 180ms, background-color 180ms; }
+.plaintiff-intake-form :is(input:not([type="hidden"]), textarea):focus { background-color: #fffdf5; }
+
 .plaintiff-intake-form [aria-invalid="true"] {
   border-color: #a84b43;
 }
@@ -94,6 +104,7 @@
   white-space: nowrap;
 }
 
+.plaintiff-intake-title,
 .plaintiff-intake-description {
   margin-top: 16px;
 }
@@ -238,6 +249,25 @@
   color: var(--muted);
   font-size: 13px;
   line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .plaintiff-intake-back { animation: intake-arrive 400ms both; }
+  .plaintiff-intake-heading h1 > span { animation: intake-heading-arrive 600ms 40ms cubic-bezier(.22, 1, .36, 1) both; }
+  .plaintiff-intake-heading > p { animation: intake-arrive 600ms 120ms both; }
+  .plaintiff-intake-form { animation: intake-arrive 650ms 160ms both; }
+  .plaintiff-intake-group:first-of-type { animation: intake-arrive 650ms 200ms both; }
+  .plaintiff-intake-group + .plaintiff-intake-group { animation: intake-arrive 650ms 280ms both; }
+  .plaintiff-intake-next { animation: intake-arrive 700ms 320ms both; }
+  .plaintiff-intake-actions { animation: intake-arrive 550ms 360ms both; }
+  .plaintiff-intake-form .field:focus-within > label { transform: translateY(-1px); transition: color 180ms, transform 180ms; }
+}
+
+@keyframes intake-arrive { from { opacity: .4; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+@keyframes intake-heading-arrive { from { transform: translateY(105%); } to { transform: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .plaintiff-intake *, .plaintiff-intake *::before, .plaintiff-intake *::after { animation: none !important; transition: none !important; }
 }
 
 .plaintiff-confirmation-next p + p {

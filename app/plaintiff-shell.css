@@ -2,6 +2,13 @@
   display: block;
 }
 
+.plaintiff-browsing {
+  --file-paper: #fffdf7;
+  background: #f4f2eb;
+}
+
+.plaintiff-browsing .topbar { background: #f9f8f3; }
+
 .plaintiff-shell .main {
   min-width: 0;
 }
@@ -67,9 +74,17 @@
   font-size: clamp(30px, 3vw, 36px);
 }
 
-.plaintiff-shell .plaintiff-home-view .bookshelf-index {
-  top: 104px;
-  max-height: calc(100dvh - 128px);
+.plaintiff-browsing .content {
+  width: min(100%, 1320px);
+  margin-inline: auto;
+  padding: 34px 40px 64px;
+}
+
+.plaintiff-shell .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  background: #faf9f5;
 }
 
 @media (max-width: 1080px) {

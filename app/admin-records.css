@@ -263,7 +263,7 @@
 }
 
 .admin-record-detail .admin-history ol {
-  gap: 18px;
+  --history-gap: 18px;
 }
 
 .admin-history-event {

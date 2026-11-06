@@ -9,7 +9,7 @@ import { AccountSwitcher, Brand } from "./workspace-chrome";
 import { FirmWorkspace } from "./firm-workspace";
 import { AdminWorkspace } from "./admin-workspace";
 import { DemoAccountGuide } from "./demo-account-guide";
-import { PlaintiffHome } from "./plaintiff-view";
+import { PlaintiffHome, type PlaintiffRequestState, type PlaintiffRequestKind } from "./plaintiff-view";
 import { PlaintiffIntake, RequestSubmitted, type IntakeDraft, type IntakeFieldErrors } from "./plaintiff-intake";
 import { PlaintiffCaseDetail, PlaintiffLeadDetail, type PlaintiffCaseRecord } from "./plaintiff-records";
 import { animateWorkspace, observeScrollReveals, stopWorkspaceTransition } from "./workspace-motion";
@@ -25,6 +25,7 @@ type StaffFilter = LeadStatus | "all" | "cases";
 type PlaintiffNotice = { id: string; message: string; createdAt: string };
 export type Lead = {
   id: string;
+  title?: string | null;
   name: string;
   email: string;
   category: string;
@@ -116,13 +117,17 @@ function focusHeading(heading: HTMLHeadingElement | null) {
   heading?.focus({ preventScroll: true });
 }
 
-function writeRecordUrl(leadId?: string, caseId?: string, replace = false) {
+function writeRecordUrl(leadId?: string, caseId?: string, replace = false, requestState?: PlaintiffRequestState, requestKind?: PlaintiffRequestKind) {
   const url = new URL(window.location.href);
   url.searchParams.delete("lead");
   url.searchParams.delete("case");
   for (const name of ["view", "leadStatus", "caseStatus", "status", "firmId", "sort", "region", "category", "q", "layout"]) url.searchParams.delete(name);
   if (leadId) url.searchParams.set("lead", leadId);
   if (caseId) url.searchParams.set("case", caseId);
+  if (requestKind === "all") url.searchParams.delete("requestKind");
+  else if (requestKind) url.searchParams.set("requestKind", requestKind);
+  if (requestState === "all") url.searchParams.delete("requestState");
+  else if (requestState) url.searchParams.set("requestState", requestState);
   if (url.href === window.location.href) return;
   if (replace) window.history.replaceState(null, "", url);
   else window.history.pushState(null, "", url);
@@ -147,7 +152,7 @@ export function Workspace() {
     const current = sessionRef.current?.user;
     if (current?.id === next.user?.id && current?.role === next.user?.role && current?.firmId === next.user?.firmId) return true;
     stopWorkspaceTransition();
-    writeRecordUrl(undefined, undefined, true);
+    writeRecordUrl(undefined, undefined, true, "all", "all");
     setSession(next);
     return false;
   }, []);
@@ -174,7 +179,7 @@ export function Workspace() {
         password: "grand-charter-demo",
       });
       await animateWorkspace("session", () => {
-        if (action === "switch") writeRecordUrl(undefined, undefined, true);
+        if (action === "switch") writeRecordUrl(undefined, undefined, true, "all", "all");
         window.scrollTo(0, 0);
         setSession((current) => current && { ...current, user });
         setDemoEmail("");
@@ -210,7 +215,7 @@ export function Workspace() {
     try {
       await request("/api/session", { method: "DELETE" });
       await animateWorkspace("session", () => {
-        writeRecordUrl(undefined, undefined, true);
+        writeRecordUrl(undefined, undefined, true, "all", "all");
         window.scrollTo(0, 0);
         setSession((current) => current && { ...current, user: null });
         setEntrySettled(true);
@@ -307,10 +312,10 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const isAdmin = user.role === "admin";
   const home = isPlaintiff ? "My requests" : isAdmin ? "Lead queue" : "Lead inbox";
   const [composing, setComposing] = useState(false);
-  const [intakeDraft, setIntakeDraft] = useState<IntakeDraft>({ name: user.name, email, region: "", category: "", description: "" });
+  const [intakeDraft, setIntakeDraft] = useState<IntakeDraft>({ name: user.name, email, region: "", category: "", title: "", description: "" });
   const [intakeFieldErrors, setIntakeFieldErrors] = useState<IntakeFieldErrors>({});
   const hasIntakeDraft = isPlaintiff && (intakeDraft.name.trim() !== user.name.trim() || intakeDraft.email.trim() !== email.trim()
-    || !!intakeDraft.region || !!intakeDraft.category || !!intakeDraft.description.trim());
+    || !!intakeDraft.region || !!intakeDraft.category || !!intakeDraft.title.trim() || !!intakeDraft.description.trim());
   const leaveDraftDialog = useRef<HTMLDialogElement>(null);
   const pendingAccountChange = useRef<(() => void) | undefined>(undefined);
   const [submitted, setSubmitted] = useState<Lead>();
@@ -327,11 +332,22 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const moreRequest = useRef<AbortController | null>(null);
   const [selectedId, setSelectedId] = useState<string>();
   const [leadResult, setLeadResult] = useState<LeadResult>();
+  const [pendingRequest, setPendingRequest] = useState<string>();
+  const [pendingRequestState, setPendingRequestState] = useState<PlaintiffRequestState>();
+  const [pendingRequestKind, setPendingRequestKind] = useState<PlaintiffRequestKind>();
+  const preparedList = useRef<string | undefined>(undefined);
+  const plaintiffHistory = useRef<(id?: string, linkedCase?: string, state?: PlaintiffRequestState, replace?: boolean, kind?: PlaintiffRequestKind) => void>(() => {});
+  const [selectionError, setSelectionError] = useState("");
+  const [preparedCase, setPreparedCase] = useState<PlaintiffCaseRecord>();
+  const selectionRequest = useRef<AbortController | null>(null);
+  const preparedLead = useRef<string | undefined>(undefined);
   const [caseId, setCaseId] = useState<string>();
   const [notice, setNotice] = useState("");
   const [action, setAction] = useState<LeadDecision | "submit">();
   const [actionError, setActionError] = useState("");
   const [filter, setFilter] = useState<StaffFilter>(isAdmin ? "all" : "awaiting_firm_review");
+  const [requestState, setRequestState] = useState<PlaintiffRequestState>("all");
+  const [requestKind, setRequestKind] = useState<PlaintiffRequestKind>("all");
   const [region, setRegion] = useState("");
   const [category, setCategory] = useState("");
   const [firmFilter, setFirmFilter] = useState("");
@@ -365,6 +381,8 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   if (category) parameters.set("category", category);
   if (firmFilter) parameters.set("firmId", firmFilter);
   if (query) parameters.set("q", query);
+  if (isPlaintiff && requestState !== "all") parameters.set("requestState", requestState);
+  if (isPlaintiff && requestKind !== "all") parameters.set("requestKind", requestKind);
   const listUrl = `/api/${filter === "cases" ? "cases" : "leads"}?${parameters}`;
 
   useEffect(() => {
@@ -387,7 +405,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   }
 
   function resetIntakeDraft() {
-    setIntakeDraft({ name: user.name, email, region: "", category: "", description: "" });
+    setIntakeDraft({ name: user.name, email, region: "", category: "", title: "", description: "" });
     intakeAttempt.current = null;
     setIntakeFieldErrors({});
   }
@@ -406,7 +424,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     setAccessError("");
     setLeads((current) => current?.filter(({ id }) => id !== selectedId));
     setListAttempt((attempt) => attempt + 1);
-    writeRecordUrl(undefined, undefined, true);
+    writeRecordUrl(undefined, undefined, true, "all", "all");
     setNotice("This record is no longer available to your account. The list has been refreshed.");
     void verifySession().catch(() => {});
   }, [selectedId, verifySession]);
@@ -473,6 +491,12 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       const params = new URLSearchParams(window.location.search);
       const id = params.get("lead") || undefined;
       const linkedCase = params.get("case") || undefined;
+      const state = params.get("requestState");
+      if (isPlaintiff) {
+        setRequestState(state === "active" || state === "closed" ? state : "all");
+        const kind = params.get("requestKind");
+        setRequestKind(kind === "requests" || kind === "cases" ? kind : "all");
+      }
       setSelectedId(id);
       setCaseId(id ? linkedCase : undefined);
       setComposing(false);
@@ -483,15 +507,23 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     }
     restoreRecord();
     const onHistory = () => {
+      selectionRequest.current?.abort();
+      setPendingRequest(undefined);
       initialRequestChecked.current = true;
       historyRevision.current += 1;
-      animateWorkspace("page", restoreRecord);
+      if (isPlaintiff) {
+        const params = new URLSearchParams(window.location.search);
+        const state = params.get("requestState");
+        plaintiffHistory.current(params.get("lead") || undefined, params.get("case") || undefined,
+          state === "active" || state === "closed" ? state : "all", true,
+          params.get("requestKind") === "requests" ? "requests" : params.get("requestKind") === "cases" ? "cases" : "all");
+      } else animateWorkspace("page", restoreRecord);
     };
     window.addEventListener("popstate", onHistory);
     return () => window.removeEventListener("popstate", onHistory);
-  }, [isAdmin]);
+  }, [isAdmin, isPlaintiff]);
 
-  useEffect(() => observeScrollReveals(content.current), [leads, filter, composing, selectedId]);
+  useEffect(() => { if (!isPlaintiff) return observeScrollReveals(content.current); }, [leads, filter, composing, selectedId, isPlaintiff]);
 
   useLayoutEffect(() => {
     if (!isPlaintiff || !matchMedia("(max-width: 760px)").matches) return;
@@ -504,6 +536,10 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   }, [isPlaintiff, selectedId, caseId]);
 
   useEffect(() => {
+    if (preparedList.current === listUrl) {
+      preparedList.current = undefined;
+      return;
+    }
     const controller = new AbortController();
     const revision = listRevision.current;
     setListLoading(true);
@@ -576,11 +612,16 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
 
   useEffect(() => {
     if (!selectedId) return;
+    if (preparedLead.current === selectedId) {
+      preparedLead.current = undefined;
+      return;
+    }
     const controller = new AbortController();
     request<{ lead: Lead }>(`/api/leads/${encodeURIComponent(selectedId)}`, { signal: controller.signal })
       .then(({ lead }) => {
         if (controller.signal.aborted) return;
-        setLeadResult({ id: selectedId, lead });
+        if (isPlaintiff) void animateWorkspace("record", () => setLeadResult({ id: selectedId, lead }));
+        else setLeadResult({ id: selectedId, lead });
         if (!isPlaintiff && !isAdmin) setFilter(lead.status);
       })
       .catch((error: unknown) => {
@@ -591,7 +632,8 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     return () => controller.abort();
   }, [selectedId, isPlaintiff, isAdmin, onAccessLost]);
 
-  function applySelection(id?: string, linkedCase?: string) {
+  function applySelection(id?: string, linkedCase?: string, nextRequestState = requestState, replace = false, nextKind = requestKind) {
+    setComposing(false);
     initialRequestChecked.current = true;
     if (selectedId !== id) setLeadResult(undefined);
     setSubmitted(undefined);
@@ -600,14 +642,86 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     setActionError("");
     setAccessError("");
     setNotice("");
-    writeRecordUrl(id, linkedCase);
+    setSelectionError("");
+    if (isPlaintiff) { setRequestState(nextRequestState); setRequestKind(nextKind); }
+    writeRecordUrl(id, linkedCase, replace, isPlaintiff ? nextRequestState : undefined, isPlaintiff ? nextKind : undefined);
   }
 
+  function navigatePlaintiff(id?: string, linkedCase?: string, nextState = requestState, replace = false, nextKind = requestKind) {
+    stopWorkspaceTransition();
+    selectionRequest.current?.abort();
+    setPendingRequest(undefined);
+    setPendingRequestState(undefined);
+    setPendingRequestKind(undefined);
+    setSelectionError("");
+    const collectionChanged = nextState !== requestState || nextKind !== requestKind;
+    if (!collectionChanged && selectedId === id && caseId === linkedCase) return;
+    const mobile = matchMedia("(max-width: 760px)").matches;
+    const target = new URL(listUrl, window.location.origin);
+    target.searchParams.delete("requestState");
+    if (nextState !== "all") target.searchParams.set("requestState", nextState);
+    target.searchParams.delete("requestKind");
+    if (nextKind !== "all") target.searchParams.set("requestKind", nextKind);
+    const targetPath = `/api/leads?${target.searchParams}`;
+    const controller = new AbortController();
+    selectionRequest.current = controller;
+    setPendingRequest(id);
+    if (collectionChanged) { setPendingRequestState(nextState); setPendingRequestKind(nextKind); }
+    void Promise.all([
+      id ? request<{ lead: Lead }>(`/api/leads/${encodeURIComponent(id)}`, { signal: controller.signal }) : Promise.resolve(undefined),
+      linkedCase ? request<{ case: PlaintiffCaseRecord }>(`/api/cases/${encodeURIComponent(linkedCase)}`, { signal: controller.signal }) : Promise.resolve(undefined),
+      collectionChanged ? loadRecords(targetPath, controller.signal) : Promise.resolve(undefined),
+    ]).then(([record, caseResult, page]) => {
+      if (controller.signal.aborted) return;
+      if (mobile && !selectedId && id) requestListScroll.current = window.scrollY;
+      selectionRequest.current = null;
+      if (id) preparedLead.current = id;
+      if (page) {
+        listRevision.current += 1;
+        moreRequest.current?.abort();
+        preparedList.current = targetPath;
+      }
+      void animateWorkspace(collectionChanged ? "collection" : "record", () => {
+        applySelection(id, linkedCase, nextState, replace, nextKind);
+        setPreparedCase(caseResult?.case);
+        if (record && id) setLeadResult({ id, lead: record.lead });
+        if (page) {
+          setLeads(page.leads);
+          setNextCursor(page.nextCursor);
+          setListLoading(false);
+          setLoadingMore(false);
+          setListError("");
+          setMoreError("");
+        }
+        setPendingRequest(undefined);
+        setPendingRequestState(undefined);
+        setPendingRequestKind(undefined);
+      });
+    }).catch((error: unknown) => {
+      if (controller.signal.aborted) return;
+      setPendingRequest(undefined);
+      setPendingRequestState(undefined);
+      setPendingRequestKind(undefined);
+      if (replace) writeRecordUrl(selectedId, caseId, true, requestState, requestKind);
+      setSelectionError(isAccessError(error) ? "This request is no longer available. Your current file is still open." : messageFor(error));
+      if (isAccessError(error)) setListAttempt((attempt) => attempt + 1);
+    });
+  }
+  plaintiffHistory.current = navigatePlaintiff;
+
   function select(id?: string, linkedCase?: string) {
-    if (selectedId === id && caseId === linkedCase) return;
-    const mobileSheet = isPlaintiff && matchMedia("(max-width: 760px)").matches;
-    if (mobileSheet && !selectedId && id) requestListScroll.current = window.scrollY;
-    animateWorkspace(mobileSheet ? "page" : "detail", () => applySelection(id, linkedCase));
+    if (isPlaintiff) navigatePlaintiff(id, linkedCase);
+    else if (selectedId !== id || caseId !== linkedCase) void animateWorkspace("detail", () => applySelection(id, linkedCase));
+  }
+
+  useEffect(() => () => selectionRequest.current?.abort(), []);
+
+  function changeRequestState(nextState: PlaintiffRequestState) {
+    navigatePlaintiff(undefined, undefined, nextState);
+  }
+
+  function changeRequestKind(kind: PlaintiffRequestKind) {
+    navigatePlaintiff(undefined, undefined, requestState, false, kind);
   }
 
   function selectCase(id?: string) {
@@ -618,8 +732,15 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   }
 
   function showIntake(show: boolean) {
+    selectionRequest.current?.abort();
+    setPendingRequest(undefined);
+    setPendingRequestState(undefined);
+    setPendingRequestKind(undefined);
     initialRequestChecked.current = true;
-    if (show === composing && !selectedId && !submitted) return;
+    if (show === composing && !selectedId && !submitted) {
+      stopWorkspaceTransition();
+      return;
+    }
     animateWorkspace("page", () => {
       applySelection();
       setComposing(show);
@@ -637,10 +758,10 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
     setIntakeFieldErrors({});
     setAction("submit");
     try {
-      const input = Object.fromEntries(["name", "email", "region", "category", "description"]
+      const input = Object.fromEntries(["name", "email", "region", "category", "title", "description"]
         .map((name) => {
           const value = String(form.get(name) ?? "");
-          return [name, ["name", "email", "description"].includes(name) ? value.trim() : value];
+          return [name, ["name", "email", "title", "description"].includes(name) ? value.trim() : value];
         }));
       const payload = JSON.stringify(input);
       if (intakeAttempt.current?.payload !== payload) intakeAttempt.current = { payload, key: crypto.randomUUID() };
@@ -653,10 +774,10 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
       setLeads((current) => [created, ...(current ?? []).filter(({ id }) => id !== created.id)]);
       setListAttempt((current) => current + 1);
       if (submittedAtHistory !== historyRevision.current) {
-        setNotice("Your request was submitted. You can find it in My requests.");
+        setNotice("Your request was submitted. You can find it in My requests & cases.");
         return;
       }
-      applySelection(created.id);
+      applySelection(created.id, undefined, "all", false, "all");
       setLeadResult({ id: created.id, lead: created });
       setComposing(false);
       setSubmitted(created);
@@ -729,6 +850,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   const record = selectedId ? (
     caseId && lead?.caseId === caseId ? (
       isPlaintiff ? <PlaintiffCaseDetail key={caseId} id={caseId} lead={lead} back={() => select()}
+        initialCase={preparedCase?.id === caseId ? preparedCase : undefined}
         locked={acting} onBusyChange={setChildBusy} onAccessLost={onAccessLost} onLoaded={updatePlaintiffCase}
         refreshVersion={refreshVersion} /> :
       <CaseDetail key={caseId} id={caseId} lead={lead} back={() => selectCase()} role={user.role}
@@ -749,7 +871,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
             canUpload={isPlaintiff && lead.status !== "closed"} onBusyChange={setChildBusy} disabled={acting}
             onAccessLost={onAccessLost} refreshVersion={refreshVersion} /> : undefined} />
     ) : (
-      <div className="bookshelf-placeholder">
+      <div className={isPlaintiff ? "plaintiff-record-pending" : "bookshelf-placeholder"} aria-busy={!recordError}>
         <button className="subtle-link" onClick={() => select()}><Icon name="back" size={16} />{home}</button>
         {recordError ? <Message error>{recordError}</Message> : <p role="status">Loading details…</p>}
       </div>
@@ -763,7 +885,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
   );
 
   return (
-    <div className={`shell demo-portal${isPlaintiff ? " plaintiff-shell" : ""}`}>
+    <div className={`shell demo-portal${isPlaintiff ? " plaintiff-shell" : ""}${isPlaintiff && !composing && !submitted ? " plaintiff-browsing" : ""}`}>
       {!isPlaintiff && <aside className="sidebar" aria-label="Workspace">
         <Brand />
         <div className="workspace-label">Workspace</div>
@@ -790,7 +912,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
             <Brand />
             <nav className="plaintiff-navigation" aria-label="Main navigation">
               <button type="button" aria-current={!composing ? "page" : undefined}
-                disabled={acting || !!sessionAction} onClick={() => showIntake(false)}>My requests</button>
+                disabled={acting || !!sessionAction} onClick={() => showIntake(false)}>My requests & cases</button>
               <button type="button" aria-current={composing ? "page" : undefined}
                 disabled={!leads || acting || !!sessionAction} onClick={() => showIntake(true)}>{hasIntakeDraft ? "Continue request" : "New request"}</button>
             </nav>
@@ -809,6 +931,7 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
         <div className="content motion-enter" ref={content} inert={!!sessionAction}>
           {sessionError && <Message error>{sessionError}</Message>}
           {notice && <Message>{notice}</Message>}
+          {selectionError && <Message error>{selectionError}</Message>}
           {accessChecking && <Message>Checking your current access…</Message>}
           {accessError && <Message error>{accessError}{" "}
             <button className="subtle-link" onClick={() => recheckAccess.current()}>Try again</button>
@@ -887,7 +1010,11 @@ function Portal({ user, email, accounts, switchAccount, signOut, sessionAction, 
                   isPlaintiff ? (
                     <PlaintiffHome leads={leads} loading={listLoading} selectedId={selectedId} record={record}
                       onSelect={select} onStart={() => showIntake(true)} locked={acting} pagination={pagination}
-                      firstName={user.name.trim().split(/\s+/)[0]} hasDraft={hasIntakeDraft} />
+                      firstName={user.name.trim().split(/\s+/)[0]} hasDraft={hasIntakeDraft}
+                      pendingRequest={pendingRequest} pendingRequestState={pendingRequestState} pendingRequestKind={pendingRequestKind}
+                      requestKind={requestKind} onRequestKindChange={changeRequestKind}
+                      onResetFilters={() => navigatePlaintiff(undefined, undefined, "all", false, "all")}
+                      requestState={requestState} onRequestStateChange={changeRequestState} />
                   ) : (
                     <StaffList leads={leads ?? []} selectedId={selectedId} select={select} admin={isAdmin} filter={filter}
                       loading={listLoading} pagination={pagination}

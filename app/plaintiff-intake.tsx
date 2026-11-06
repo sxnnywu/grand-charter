@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { categories, regions } from "@/lib/intake-options";
+import { IssueSelect } from "./issue-select";
 import "./plaintiff-intake.css";
 
 export type IntakeDraft = {
+  title: string;
   name: string;
   email: string;
   region: string;
@@ -13,14 +15,7 @@ export type IntakeDraft = {
 };
 export type IntakeFieldErrors = Partial<Record<keyof IntakeDraft, string>>;
 
-const intakeFields = ["name", "email", "region", "category", "description"] as const;
-const categoryExamples: Record<string, string> = {
-  Employment: "work, pay, or dismissal",
-  Housing: "renting or a landlord",
-  "Personal injury": "an accident or injury",
-  "Contract dispute": "a disagreement about an agreement",
-};
-
+const intakeFields = ["name", "email", "region", "category", "title", "description"] as const;
 function validateIntake(form: HTMLFormElement): IntakeFieldErrors {
   const values = new FormData(form);
   const value = (name: keyof IntakeDraft) => String(values.get(name) ?? "").trim();
@@ -32,6 +27,7 @@ function validateIntake(form: HTMLFormElement): IntakeFieldErrors {
   else if (email.validity.typeMismatch || value("email").length > 180) errors.email = "Enter a valid email address.";
   if (!regions.includes(value("region"))) errors.region = "Choose a province.";
   if (!categories.includes(value("category"))) errors.category = "Choose the closest type of legal help.";
+  if (value("title").length > 80) errors.title = "Use 80 characters or fewer for the request name.";
   if (!value("description")) errors.description = "Describe what happened and what you need help with.";
   else if (value("description").length > 2500) errors.description = "Use 2,500 characters or fewer.";
   return errors;
@@ -76,7 +72,7 @@ export function PlaintiffIntake({ draft, hasDraft, updateDraft, discardDraft, su
 
   function focusFirstError(nextErrors: IntakeFieldErrors) {
     const name = intakeFields.find((field) => nextErrors[field]);
-    const control = name && form.current?.elements.namedItem(name);
+    const control = name === "category" ? document.getElementById("plaintiff-intake-category") : name && form.current?.elements.namedItem(name);
     if (control instanceof HTMLElement) control.focus();
   }
 
@@ -98,12 +94,18 @@ export function PlaintiffIntake({ draft, hasDraft, updateDraft, discardDraft, su
     return errors[field] ? <small className="plaintiff-intake-field-error" id={`plaintiff-intake-${field}-error`}>{errors[field]}</small> : null;
   }
 
-  return <div className="plaintiff-intake">
+  function finishEntrance(event: { currentTarget: HTMLDivElement }) {
+    event.currentTarget.getAnimations({ subtree: true }).forEach(animation => {
+      if ("animationName" in animation && ["intake-arrive", "intake-heading-arrive"].includes(String(animation.animationName))) animation.finish();
+    });
+  }
+
+  return <div className="plaintiff-intake" onClickCapture={finishEntrance} onKeyDownCapture={finishEntrance}>
     <button className="subtle-link plaintiff-intake-back" type="button" onClick={cancel} disabled={submitting}>
       <Arrow back />My requests
     </button>
     <header className="page-heading plaintiff-intake-heading">
-      <h1 tabIndex={-1} ref={focusHeading}>Start a request</h1>
+      <h1 tabIndex={-1} ref={focusHeading}><span>Start a request</span></h1>
       <p>Describe your situation so a law firm can review your request.</p>
     </header>
     <div className="plaintiff-intake-layout">
@@ -132,7 +134,7 @@ export function PlaintiffIntake({ draft, hasDraft, updateDraft, discardDraft, su
           });
         }}
         aria-busy={submitting} aria-describedby={error || hasFieldErrors ? "plaintiff-intake-error" : undefined}>
-        <p className="plaintiff-intake-required">All fields are required.</p>
+        <p className="plaintiff-intake-required">All fields are required unless marked optional.</p>
         {(error || hasFieldErrors) && <div className="workspace-message workspace-error" id="plaintiff-intake-error" role="alert" tabIndex={-1} ref={errorSummary}>
           {hasFieldErrors ? "Check the highlighted details below." : error}
         </div>}
@@ -161,13 +163,20 @@ export function PlaintiffIntake({ draft, hasDraft, updateDraft, discardDraft, su
               {fieldError("region")}
             </div>
             <div className="field"><label htmlFor="plaintiff-intake-category">Type of legal help</label>
-              <select {...fieldProps("category", "plaintiff-intake-category-help")} name="category" required defaultValue={draft.category}>
-                <option value="" disabled>Select a type</option>
-                {categories.map((category) => <option key={category} value={category}>{category} - {categoryExamples[category]}</option>)}
-              </select>
-              <small id="plaintiff-intake-category-help">Choose the closest fit for your situation.</small>
+              <IssueSelect {...fieldProps("category", "plaintiff-intake-category-help")} value={draft.category} disabled={submitting}
+                onChange={category => {
+                  updateDraft({ ...draft, category });
+                  setClientErrors(current => { const next = { ...current }; delete next.category; return next; });
+                }} />
+              <small id="plaintiff-intake-category-help">Search by the issue, such as pay or renting. Choose the closest fit.</small>
               {fieldError("category")}
             </div>
+          </div>
+          <div className="field plaintiff-intake-title"><label htmlFor="plaintiff-intake-title">Give this request a short name (optional)</label>
+            <input {...fieldProps("title", "plaintiff-intake-title-help")} name="title" defaultValue={draft.title} maxLength={80}
+              placeholder="For example, unpaid overtime" />
+            <small id="plaintiff-intake-title-help">A name to help you find it later. You can leave this blank.</small>
+            {fieldError("title")}
           </div>
           <div className="field plaintiff-intake-description"><label htmlFor="plaintiff-intake-description">What happened?</label>
             <textarea {...fieldProps("description", "plaintiff-intake-description-count")} name="description" rows={5} required maxLength={2500} defaultValue={draft.description}

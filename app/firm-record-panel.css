@@ -133,10 +133,6 @@
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .firm-record-panel:not(.is-drawer) > .firm-record-panel-content > .firm-record {
-    animation: workspace-enter 190ms ease-out;
-  }
-
   .firm-record-panel-close {
     transition: background-color 150ms ease, border-color 150ms ease;
   }

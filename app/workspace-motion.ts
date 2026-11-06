@@ -1,86 +1,118 @@
 import { flushSync } from "react-dom";
 
-let activeTransition: ViewTransition | Animation | undefined;
-let activeShade: Animation | undefined;
+let activeAnimations: Animation[] = [];
+let revision = 0;
 type WorkspaceTransitionScope = "page" | "detail" | "session" | "drawer" | "record" | "collection";
 const motionPreference = "(prefers-reduced-motion: no-preference)";
 
 export function stopWorkspaceTransition() {
-  if (activeTransition && "skipTransition" in activeTransition) activeTransition.skipTransition();
-  else activeTransition?.cancel();
-  activeShade?.cancel();
-  activeShade = undefined;
-  activeTransition = undefined;
+  revision += 1;
+  activeAnimations.forEach((animation) => animation.cancel());
+  activeAnimations = [];
   delete document.documentElement.dataset.workspaceTransition;
 }
 
-export function animateWorkspace(scope: WorkspaceTransitionScope, update: () => void): Promise<void> {
+export async function animateWorkspace(scope: WorkspaceTransitionScope, update: () => void): Promise<void> {
   if (scope !== "session" && document.documentElement.dataset.workspaceTransition === "session") {
-    update();
-    return Promise.resolve();
+    flushSync(update);
+    return;
   }
   stopWorkspaceTransition();
-  // Collections can depend on async data. Snapshot crossfades mix two different
-  // records layouts and can capture a loading frame instead of the destination.
-  if (scope === "collection" || scope === "record" || !matchMedia(motionPreference).matches) {
-    update();
-    return Promise.resolve();
-  }
-
-  document.documentElement.dataset.workspaceTransition = scope;
-  if (!document.startViewTransition) {
-    return animateWorkspaceFallback(scope, update);
-  }
-
-  const transition = document.startViewTransition(() => {
-    if (activeTransition === transition || scope === "session") flushSync(update);
-  });
-  activeTransition = transition;
-  void transition.ready.catch(() => {});
-  return transition.finished.catch(() => {}).then(() => {
-    if (activeTransition === transition) stopWorkspaceTransition();
-  });
-}
-
-async function animateWorkspaceFallback(scope: WorkspaceTransitionScope, update: () => void): Promise<void> {
-  const selector = scope === "session" ? ".demo-entry, .demo-portal" : scope === "page" ? ".portal-page"
-    : scope === "drawer" ? ".firm-record-panel.is-drawer" : scope === "record" ? ".firm-record-panel-content"
-      : scope === "collection" ? ".firm-board-canvas, .firm-list" : ".workspace-record";
-  const visibleTarget = () => {
-    const target = document.querySelector<HTMLElement>(selector);
-    return target?.animate && target.getClientRects().length ? target : undefined;
+  const current = revision;
+  const motion = matchMedia(motionPreference).matches;
+  const titleOrigins = new Map((scope === "record" || scope === "detail" ? Array.from(document.querySelectorAll<HTMLElement>("[data-matter-id]")) : []).map(item => {
+    const title = item.querySelector<HTMLElement>(".request-title");
+    return [item.dataset.matterId!, title ? { box: title.getBoundingClientRect(), font: parseFloat(getComputedStyle(title).fontSize) } : undefined];
+  }));
+  const leavingIntake = !!document.querySelector(".plaintiff-intake");
+  const panel = document.querySelector<HTMLElement>(".firm-record-panel.is-drawer");
+  const animate = (element: HTMLElement | null, frames: Keyframe[], duration = 320, delay = 0) => {
+    if (!element?.animate || !element.getClientRects().length) return;
+    activeAnimations.push(element.animate(frames, { duration, delay, easing: "cubic-bezier(.22, 1, .36, 1)", fill: "both" }));
   };
 
-  const target = visibleTarget();
-  if (target) {
-    const departure = target.animate([
-      { opacity: 1, transform: "translate(0, 0)" },
-      { opacity: scope === "drawer" ? 1 : 0.45, transform: scope === "drawer" ? "translateX(100%)" : "translateY(-4px)" },
-    ], { duration: scope === "session" ? 75 : scope === "drawer" ? 160 : 95, easing: "ease-in", fill: "forwards" });
-    if (scope === "drawer") activeShade = document.querySelector<HTMLElement>(".firm-record-panel-backdrop")?.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160 });
-    activeTransition = departure;
-    await departure.finished.catch(() => {});
-    if (activeTransition !== departure) {
-      if (scope === "session") flushSync(update);
-      return;
-    }
-    departure.cancel();
-  }
-
-  flushSync(update);
-  const nextTarget = visibleTarget();
-  if (!nextTarget) {
+  if (motion && scope === "drawer" && panel) {
+    document.documentElement.dataset.workspaceTransition = scope;
+    animate(panel, [{ transform: getComputedStyle(panel).transform }, { transform: "translateX(100%)" }], 210);
+    animate(document.querySelector(".firm-record-panel-backdrop"), [{ opacity: 1 }, { opacity: 0 }], 180);
+    await Promise.all(activeAnimations.map((animation) => animation.finished.catch(() => {})));
+    if (current !== revision) return;
+    activeAnimations.forEach((animation) => animation.cancel());
+    activeAnimations = [];
+    flushSync(update);
     stopWorkspaceTransition();
     return;
   }
-  const arrival = nextTarget.animate([
-    { opacity: scope === "drawer" ? 1 : 0.45, transform: scope === "drawer" ? "translateX(100%)" : "translateY(5px)" },
-    { opacity: 1, transform: "translate(0, 0)" },
-  ], { duration: scope === "session" ? 175 : scope === "drawer" ? 220 : 185, easing: "cubic-bezier(.2,.75,.3,1)" });
-  if (scope === "drawer") activeShade = document.querySelector<HTMLElement>(".firm-record-panel-backdrop")?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180 });
-  activeTransition = arrival;
-  await arrival.finished.catch(() => {});
-  if (activeTransition === arrival) stopWorkspaceTransition();
+
+  if (motion && scope === "page" && document.querySelector(".plaintiff-shell")) {
+    const departure = document.querySelector<HTMLElement>(leavingIntake ? ".plaintiff-intake" : ".plaintiff-request-navigator, .plaintiff-home-start");
+    animate(departure, [{ transform: "translateY(0)", opacity: 1 },
+      { transform: `translateY(${leavingIntake ? 18 : -18}px)`, opacity: 0 }], 170);
+    await Promise.all(activeAnimations.map(animation => animation.finished.catch(() => {})));
+    if (current !== revision) return;
+    activeAnimations.forEach(animation => animation.cancel());
+    activeAnimations = [];
+  }
+
+  // Animate live destinations after their data is ready. Browser snapshots can
+  // capture loading frames and blend different layouts or confidential records.
+  flushSync(update);
+  if (!motion) return;
+  document.documentElement.dataset.workspaceTransition = scope;
+  if (scope === "drawer") {
+    const nextPanel = document.querySelector<HTMLElement>(".firm-record-panel.is-drawer");
+    if (nextPanel && nextPanel !== panel) {
+      animate(nextPanel, [{ transform: "translateX(100%)" }, { transform: "translateX(0)" }]);
+      animate(document.querySelector(".firm-record-panel-backdrop"), [{ opacity: 0 }, { opacity: 1 }], 260);
+    }
+  } else if (scope === "page" && document.querySelector(".plaintiff-intake")) {
+    animate(document.querySelector(".plaintiff-intake-layout"), [
+      { transform: "translateX(24px) scale(.985)", transformOrigin: "left top" },
+      { transform: "none", transformOrigin: "left top" },
+    ], 700);
+  } else {
+    const selector = scope === "session" ? ".demo-entry, .demo-portal"
+      : scope === "page" ? ".portal-page"
+        : scope === "collection" ? ".firm-board-canvas, .firm-list, .admin-collection"
+          : ".plaintiff-reading-page, .firm-record-panel-content, .workspace-record";
+    const target = scope === "record" || scope === "detail" || scope === "collection" && document.querySelector(".plaintiff-reading-page")
+      ? document.querySelector<HTMLElement>(".plaintiff-reading-page") ?? document.querySelector<HTMLElement>(".firm-record-panel-content") ?? document.querySelector<HTMLElement>(".workspace-record")
+      : document.querySelector<HTMLElement>(selector);
+    if (target?.classList.contains("plaintiff-reading-page")) {
+      const selected = document.querySelector<HTMLElement>('[data-matter-id][aria-pressed="true"]');
+      const origin = selected ? titleOrigins.get(selected.dataset.matterId!) : undefined;
+      const title = target.querySelector<HTMLElement>(".record-heading");
+      if (title && origin && origin.box.bottom > 0 && origin.box.top < innerHeight) {
+        const destination = title.getBoundingClientRect();
+        const scale = origin.font / parseFloat(getComputedStyle(title).fontSize);
+        animate(title, [
+          { transform: `translate(${origin.box.left - destination.left}px, ${origin.box.top - destination.top}px) scale(${scale})`, transformOrigin: "left top" },
+          { transform: "none", transformOrigin: "left top" },
+        ], 650);
+      } else animate(title, [{ transform: "translateY(12px)" }, { transform: "none" }], 550);
+      const situation = target.querySelector<HTMLElement>(".plaintiff-situation-column");
+      const documents = target.querySelector<HTMLElement>(".plaintiff-record-documents, .plaintiff-case-content");
+      const details = target.querySelector<HTMLElement>(".plaintiff-record-details");
+      if (situation) {
+        animate(situation, [{ transform: "translateY(30px)", opacity: 0 }, { transform: "translateY(0)", opacity: 1 }], 600, 80);
+        animate(documents, [{ transform: "translateY(34px)", opacity: 0 }, { transform: "translateY(0)", opacity: 1 }], 620, 180);
+        animate(details, [{ transform: "translateY(20px)", opacity: 0 }, { transform: "translateY(0)", opacity: 1 }], 500, 280);
+      } else animate(target, [{ transform: "translateY(24px)", opacity: .6 }, { transform: "translateY(0)", opacity: 1 }], 550);
+    } else if (target && scope === "collection") {
+      animate(target, [{ transform: "translateY(12px)" }, { transform: "none" }], 420);
+      animate(document.querySelector(".firm-record-panel-content"), [{ transform: "translateY(18px)" }, { transform: "none" }], 500, 60);
+      target.querySelectorAll<HTMLElement>(".firm-case-column-heading, .firm-list-summary, .admin-collection-heading").forEach((item, index) =>
+        animate(item, [{ transform: "translateY(8px)" }, { transform: "none" }], 420, Math.min(index, 3) * 45));
+    } else animate(target, scope === "session" ? [
+      { transform: "scale(.995)", transformOrigin: "center top" },
+      { transform: "scale(1)", transformOrigin: "center top" },
+    ] : [
+      { transform: `translateY(${scope === "record" || scope === "detail" ? 10 : 14}px)` },
+      { transform: "translateY(0)" },
+    ]);
+  }
+  await Promise.all(activeAnimations.map((animation) => animation.finished.catch(() => {})));
+  if (current === revision) stopWorkspaceTransition();
 }
 
 export function observeScrollReveals(container: HTMLElement | null) {
@@ -98,6 +130,6 @@ export function observeScrollReveals(container: HTMLElement | null) {
       }
     }
   }, { threshold: 0.08 });
-  items.forEach((item) => observer.observe(item));
+  items.forEach((item) => { item.dataset.reveal = "pending"; observer.observe(item); });
   return () => observer.disconnect();
 }

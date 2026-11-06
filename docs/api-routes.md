@@ -45,12 +45,16 @@ The UI and API live in one Next.js app. Pages and API routes use the same server
 
 Lead and case lists return up to 50 records and a cursor for the next page. Firm staff and admins can search by plaintiff name or record ID. Staff search stays within their assigned firm; only admins can filter by firm. A plaintiff's lead details include their assignment and closure notices.
 
+Lead submission accepts an optional `title` of up to 80 characters. Blank names are stored as `null`; the interface uses the category as the request name and shows the description separately. The linked case keeps that same name.
+
 Lead and case lists support these query parameters:
 
 | Parameter | Behavior |
 | --- | --- |
 | `status`, `category`, `region` | Filter the matching records. For cases, `status` refers to case progress. |
 | `q` | Searches plaintiff names or full record IDs for staff and admins. Admin case searches use case IDs; staff can also use the original lead ID. |
+| `requestState` | Plaintiff lists only. Choose `all`, `active`, or `closed`. Filters by whether the request or linked case is closed, before pagination. |
+| `requestKind` | Plaintiff lists only. Choose `all`, `requests`, or `cases`. Requests have no linked case; accepted requests appear once under Cases. Combines with status before pagination and preserves ownership checks. |
 | `firmId` | Filters by firm for admins. Staff always remain limited to their assigned firm. |
 | `attention=true` | Admin lead lists only. Combines `pending_assignment` and `declined`; an additional `status` filter narrows that set. Returns `403` for other roles or `400` on the admin case list. |
 | `count=true` | Adds numeric `totalCount` for all records matching access and filters, before pagination. Empty pages still include the full matching count. Omitted by default. |

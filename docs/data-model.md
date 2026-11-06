@@ -29,7 +29,7 @@ These are the logical fields we need for the workflows.
 | --- | --- |
 | `users` | <ul><li>ID</li><li>Name</li><li>Email</li><li>Role</li><li>Firm ID for attorneys and paralegals. Each staff account belongs to one firm.</li></ul> |
 | `firms` | <ul><li>ID</li><li>Name</li></ul> |
-| `leads` | <ul><li>ID</li><li>Plaintiff user ID</li><li>Name and email as submitted</li><li>Category</li><li>Region</li><li>Description</li><li>Lead status</li><li>Current firm ID. Pending and closed leads have no current firm.</li><li>Submission time</li></ul> |
+| `leads` | <ul><li>ID</li><li>Plaintiff user ID</li><li>Name and email as submitted</li><li>Optional request title, up to 80 characters</li><li>Category</li><li>Region</li><li>Description</li><li>Lead status</li><li>Current firm ID. Pending and closed leads have no current firm.</li><li>Submission time</li></ul> |
 | `cases` | <ul><li>ID</li><li>Unique lead ID. The linked lead provides the plaintiff and current firm.</li><li>Progress status</li><li>Creation time</li></ul> |
 | `documents` | <ul><li>ID</li><li>Lead ID. The case reads documents through the lead, including plaintiff PDFs uploaded before acceptance.</li><li>Filename</li><li>Private storage key</li><li>Uploader user ID</li><li>Sharing firm ID for firm uploads</li><li>Upload time</li></ul> |
 | `firm_notes` | <ul><li>ID</li><li>Case ID</li><li>Author user ID</li><li>Owning firm ID. Ownership stays with the firm that wrote the note.</li><li>Note text</li><li>Creation time</li></ul> |

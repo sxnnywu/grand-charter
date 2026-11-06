@@ -59,6 +59,26 @@ function RecordStatus({ lead }: { lead: Lead }) {
   return <span className={`plaintiff-status plaintiff-status-${status.tone}`}>{status.label}</span>;
 }
 
+function RequestCover({ lead, close, locked }: { lead: Lead; close: () => void; locked: boolean }) {
+  return <header className="plaintiff-record-header">
+    <div className="plaintiff-file-topline">
+      <button className="subtle-link" type="button" disabled={locked} onClick={close}><Arrow back />My requests & cases</button>
+      <span>{lead.caseId ? "Case file" : "Request file"}</span>
+    </div>
+    <div className="plaintiff-record-heading">
+      <p className="plaintiff-file-category">{lead.category} · {lead.region}</p>
+      <h2 className="record-heading" tabIndex={-1} ref={focusHeading} aria-label={plaintiffRequestTitle(lead)}>
+        {plaintiffRequestTitle(lead)}
+      </h2>
+      <p className="plaintiff-file-preview">{lead.description}</p>
+    </div>
+    <div className="plaintiff-file-meta">
+      <span>Submitted <time dateTime={lead.createdAt}>{dateFormat.format(new Date(lead.createdAt))}</time></span>
+      <span>{lead.firmName ?? "No law firm assigned"}</span>
+    </div>
+  </header>;
+}
+
 function AssignmentUpdates({ lead }: { lead: Lead }) {
   const notices = (lead.notices?.length ? [...lead.notices] : lead.latestNotice ? [lead.latestNotice] : [])
     .filter((notice) => Number.isFinite(Date.parse(notice.createdAt)))
@@ -67,7 +87,7 @@ function AssignmentUpdates({ lead }: { lead: Lead }) {
   const [latest, ...earlier] = notices;
   return <section className="plaintiff-record-updates" aria-label="Assignment updates">
     <div className="plaintiff-record-update">
-      <h3>Latest update</h3>
+      <div className="plaintiff-correspondence-heading"><h3>Latest update</h3><span aria-hidden="true">↗</span></div>
       <p>{latest.message}</p>
       <time dateTime={latest.createdAt}>{updateFormat.format(new Date(latest.createdAt))}</time>
     </div>
@@ -103,33 +123,26 @@ export function PlaintiffLeadDetail({ lead, close, openCase, locked, onBusyChang
   close: () => void;
   openCase: (id: string) => void;
 }) {
-  const documents = useRef<HTMLDivElement>(null);
   const status = plaintiffStatus(lead);
   const canUpload = !lead.caseId && lead.status !== "closed";
 
   return <article className="plaintiff-record motion-enter motion-detail">
-    <header className="plaintiff-record-header">
-      <button className="subtle-link" type="button" disabled={locked} onClick={close}><Arrow back />My requests</button>
-      <div className="plaintiff-record-heading">
-        <h2 className="record-heading" tabIndex={-1} ref={focusHeading}>{plaintiffRequestTitle(lead)}</h2>
-        <p>{lead.category} · {lead.region} · Submitted {dateFormat.format(new Date(lead.createdAt))}</p>
-      </div>
-    </header>
+    <RequestCover lead={lead} close={close} locked={locked} />
     <div className="plaintiff-record-body">
+      <div className="plaintiff-situation-column">
       <section className="plaintiff-record-status" aria-label="Request progress">
-        <RecordStatus lead={lead} />
+        <span className="plaintiff-file-section-label">Where things stand</span>
         <h3>{status.message}</h3>
         {lead.caseId ? <div className="plaintiff-record-actions">
           <button className="button primary" type="button" disabled={locked} onClick={() => lead.caseId && openCase(lead.caseId)}>
             View case <Arrow />
           </button>
-        </div> : canUpload ? <>
-          <p>You don’t need to do anything right now. Supporting PDFs are optional.</p>
-          <button className="subtle-link" type="button" disabled={locked} onClick={() => showDocuments(documents)}>Add supporting PDFs <Arrow /></button>
-        </> : <p>You can still read your request and the documents shared with you.</p>}
+        </div> : <p>{status.detail ?? (canUpload ? "You don’t need to do anything right now."
+          : "You can still read your request and the documents shared with you.")}</p>}
       </section>
       <AssignmentUpdates lead={lead} />
-      {!lead.caseId && <div className="plaintiff-record-documents" ref={documents} tabIndex={-1} role="region" aria-label="Supporting documents">
+      </div>
+      {!lead.caseId && <div className="plaintiff-record-documents" tabIndex={-1} role="region" aria-label="Supporting documents">
         <LeadDocuments leadId={lead.id} role="plaintiff" canUpload={canUpload} disabled={locked}
           onBusyChange={onBusyChange} onAccessLost={onAccessLost} refreshVersion={refreshVersion} />
       </div>}
@@ -138,14 +151,15 @@ export function PlaintiffLeadDetail({ lead, close, openCase, locked, onBusyChang
   </article>;
 }
 
-export function PlaintiffCaseDetail({ id, lead, back, locked, onBusyChange, onAccessLost, onLoaded, refreshVersion }: SharedProps & {
+export function PlaintiffCaseDetail({ id, lead, back, locked, onBusyChange, onAccessLost, onLoaded, refreshVersion, initialCase }: SharedProps & {
   id: string;
   back: () => void;
   onLoaded: (item: PlaintiffCaseRecord) => void;
+  initialCase?: PlaintiffCaseRecord;
 }) {
-  const [item, setItem] = useState<PlaintiffCaseRecord>();
+  const [item, setItem] = useState<PlaintiffCaseRecord | undefined>(initialCase);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialCase);
   const [attempt, setAttempt] = useState(0);
   const tools = useRef<HTMLDivElement>(null);
 
@@ -172,34 +186,26 @@ export function PlaintiffCaseDetail({ id, lead, back, locked, onBusyChange, onAc
   const status = plaintiffStatus(currentLead);
 
   return <article className="plaintiff-record plaintiff-case motion-enter motion-detail">
-    <header className="plaintiff-record-header">
-      <button className="subtle-link" type="button" disabled={locked} onClick={back}><Arrow back />My requests</button>
-      <div className="plaintiff-record-heading">
-        <h2 className="record-heading" tabIndex={-1} ref={focusHeading}>{plaintiffRequestTitle(lead)}</h2>
-        <p>{lead.category} · {lead.region} · Submitted {dateFormat.format(new Date(lead.createdAt))}</p>
-      </div>
-      {item && <div className="plaintiff-case-summary">
-        <div className="plaintiff-case-status-heading">
-          <RecordStatus lead={currentLead} />
-          <span className="plaintiff-case-firm">{currentLead.firmName ?? "No firm assigned"}</span>
-        </div>
-        <p className="plaintiff-case-message">{status.message}</p>
-        <button className="subtle-link plaintiff-case-documents" type="button" disabled={locked} onClick={() => showDocuments(tools, item.id)}>View documents <Arrow /></button>
-      </div>}
-    </header>
+    <RequestCover lead={currentLead} close={back} locked={locked} />
     <div className="plaintiff-record-body">
-      {error && <div className="workspace-message workspace-error" role="alert">{error}{" "}
-        <button className="subtle-link" type="button" disabled={locked || loading} onClick={() => setAttempt((value) => value + 1)}>
-          {loading ? "Checking…" : "Try again"}
-        </button>
-      </div>}
+      <div className="plaintiff-situation-column">
+        {item && <div className="plaintiff-case-summary">
+          <span className="plaintiff-file-section-label">Where things stand</span>
+          <h3 className="plaintiff-case-status-heading"><RecordStatus lead={currentLead} /></h3>
+          <p className="plaintiff-case-message">{status.message}</p>
+          <button className="subtle-link plaintiff-case-documents" type="button" disabled={locked} onClick={() => showDocuments(tools, item.id)}>View documents <Arrow /></button>
+        </div>}
+        {error && <div className="workspace-message workspace-error" role="alert">{error}{" "}
+          <button className="subtle-link" type="button" disabled={locked || loading} onClick={() => setAttempt(value => value + 1)}>{loading ? "Checking…" : "Try again"}</button>
+        </div>}
+        {item && <AssignmentUpdates lead={lead} />}
+      </div>
       {item ? <>
-        <AssignmentUpdates lead={lead} />
         <div className="plaintiff-case-content" ref={tools} tabIndex={-1} role="region" aria-label="Case progress and documents">
           <CaseTools caseId={item.id} leadId={item.leadId} status={item.status} role="plaintiff"
             disabled={locked || !!error || loading} onBusyChange={onBusyChange}
             onAccessLost={onAccessLost} refreshVersion={refreshVersion}
-            onStatusChange={(nextStatus) => setItem({ ...item, status: nextStatus })} />
+            onStatusChange={nextStatus => setItem({ ...item, status: nextStatus })} />
         </div>
         <RequestDetails lead={lead} item={item} />
       </> : !error && <p className="plaintiff-record-loading" role="status">Loading your case…</p>}
