@@ -7,11 +7,13 @@ import type { Firm } from "./admin-tools";
 import { adminListUrl, adminStatuses, adminUrl, adminViews, emptyAdminLocation, readAdminLocation, type AdminLocation, type AdminView } from "./admin-navigation";
 import { isAccessError, messageFor, request } from "./api-client";
 import { FirmRecordPanel } from "./firm-record-panel";
+import { FirmCaseBoard, hasFirmBoardData, prepareFirmBoard, type FirmBoardCache, type FirmBoardGroup, type FirmBoardSummary } from "./firm-case-board";
 import { FirmStatusBadge, firmIssueExcerpt } from "./firm-records";
 import { AccountSwitcher, Brand } from "./workspace-chrome";
 import { animateWorkspace } from "./workspace-motion";
 import type { Account, Lead, User } from "./workspace";
 import "./admin-workspace.css";
+import "./firm-workspace.css";
 
 type Page = { path: string; items: Lead[]; nextCursor: string | null; totalCount: number };
 type RecordResult = { id: string; lead: Lead };
@@ -72,6 +74,10 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
   const pageRef = useRef(page);
   pageRef.current = page;
   const cache = useRef(new Map<string, Page>());
+  const boardCache = useRef<FirmBoardCache>(new Map());
+  const [boardRecords, setBoardRecords] = useState<{ path: string; groups: FirmBoardGroup[] }>();
+  const [boardSummary, setBoardSummary] = useState<{ path: string; summary: FirmBoardSummary }>();
+  const listStatus = useRef(location.status);
   const memories = useRef<Record<AdminView, AdminLocation>>({ attention: emptyAdminLocation("attention"), leads: emptyAdminLocation("leads"), cases: emptyAdminLocation("cases") });
   const collectionRequest = useRef<AbortController | undefined>(undefined);
   const navigationRequest = useRef<AbortController | undefined>(undefined);
@@ -105,6 +111,7 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
   const successHeading = useRef<HTMLParagraphElement>(null);
   const drawer = !!location.leadId;
   const path = adminListUrl(location);
+  const board = location.view === "cases" && location.layout === "board";
   const currentPage = page?.path === path ? page : undefined;
   const lead = record && record.id === location.leadId ? record.lead : undefined;
   const controls = pending ?? location;
@@ -113,6 +120,8 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
   const locked = navigationLocked || checking || recordLoading || !!recordError || !!pending;
   const busyRef = useRef(navigationLocked);
   busyRef.current = navigationLocked;
+  const receiveBoardRecords = useCallback((groups: FirmBoardGroup[]) => setBoardRecords({ path, groups }), [path]);
+  const receiveBoardSummary = useCallback((summary: FirmBoardSummary) => setBoardSummary({ path, summary }), [path]);
 
   function writeLocation(next: AdminLocation, history: "push" | "replace" | "none") {
     if (history === "none") return;
@@ -183,12 +192,15 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
     navigationRequest.current = controller;
     const settled = samePath ? pageRef.current : cache.current.get(nextPath);
     const needsRecord = !!next.leadId && recordRef.current?.id !== next.leadId;
+    const nextBoard = next.view === "cases" && next.layout === "board";
+    const cachedBoard = nextBoard && hasFirmBoardData(next, boardCache.current);
     setPending(next);
     setListError("");
     try {
       const [nextPage, nextRecord] = await Promise.all([
         settled ? Promise.resolve(settled) : loadPage(nextPath, controller.signal),
         needsRecord ? request<{ lead: Lead }>(`/api/leads/${encodeURIComponent(next.leadId!)}`, { signal: controller.signal }).then(({ lead }) => ({ id: lead.id, lead })) : Promise.resolve(undefined),
+        nextBoard && !cachedBoard ? prepareFirmBoard(next, boardCache.current, refreshVersion, controller.signal) : Promise.resolve(),
       ]);
       if (controller.signal.aborted || started !== revision.current) return;
       const scope = previous.leadId !== next.leadId ? previous.leadId && next.leadId ? "record" : "drawer" : "collection";
@@ -196,6 +208,7 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
         if (!controller.signal.aborted && started === revision.current) commit(next, history, samePath && pageRef.current?.path === nextPath ? undefined : nextPage, nextRecord);
       });
       if (!samePath && settled && !controller.signal.aborted && started === revision.current) void refreshCollection();
+      if (cachedBoard && (!samePath || previous.layout !== next.layout) && !controller.signal.aborted && started === revision.current) setRefreshVersion((value) => value + 1);
     } catch (error) {
       if (controller.signal.aborted || started !== revision.current) return;
       setPending(undefined);
@@ -302,6 +315,12 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
     void navigate(view === location.view ? withoutRecord(location) : memories.current[view]);
   }
 
+  function changeLayout(layout: AdminLocation["layout"]) {
+    if (layout === location.layout) { void navigate(withoutRecord(location)); return; }
+    if (layout === "board") listStatus.current = location.status;
+    void navigate({ ...withoutRecord(location), layout, status: layout === "board" ? "all" : listStatus.current });
+  }
+
   function filter(changes: Partial<AdminLocation>) {
     const next = withoutRecord({ ...controls, ...changes });
     void navigate(next);
@@ -339,6 +358,7 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
 
   function updated(next: Lead, message: string) {
     cache.current.clear();
+    boardCache.current.clear();
     if (locationRef.current.leadId === next.id) {
       setRecord({ id: next.id, lead: next });
       setOutcome({ id: next.id, message });
@@ -362,7 +382,8 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
     finally { if (!controller.signal.aborted) setChecking(false); }
   }
 
-  const items = currentPage?.items ?? [];
+  const items = board ? boardRecords?.path === path ? boardRecords.groups.flatMap((group) => group.items) : [] : currentPage?.items ?? [];
+  const currentBoardSummary = boardSummary?.path === path ? boardSummary.summary : undefined;
   const selectedIndex = items.findIndex(({ id }) => id === location.leadId);
   const nextReview = location.view === "attention" ? items.find((item) => item.id !== location.leadId) : undefined;
   const totalAttention = counts ? counts.unassigned + counts.declined : undefined;
@@ -397,6 +418,11 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
         </nav>
         <header className="admin-page-heading firm-page-heading">
           <div><h1 ref={heading} tabIndex={-1}>{title}</h1><p>{description}</p></div>
+          {location.view === "cases" && <div className="firm-layout-controls" role="group" aria-label="Case layout">
+            {(["list", "board"] as const).map((layout) => <button type="button" key={layout} aria-pressed={location.layout === layout}
+              data-pending={pending?.layout === layout || undefined} aria-busy={pending?.layout === layout || undefined}
+              disabled={navigationLocked} onClick={() => changeLayout(layout)}>{layout === "list" ? "List" : "Board"}</button>)}
+          </div>}
           {location.view === "attention" && <div className="admin-attention-breakdown" aria-label="Unfiltered attention counts">
             <span><strong>{counts?.unassigned ?? "…"}</strong> need a firm</span><span><strong>{counts?.declined ?? "…"}</strong> declined by firm</span>
           </div>}
@@ -422,16 +448,21 @@ export function AdminWorkspace({ user, accounts, switchAccount, signOut, session
           <div className="admin-filter-chips" aria-label="Active filters">{chips.map(({ key, label }) => <button type="button" key={key} disabled={navigationLocked} aria-label={`Remove ${label} filter`} onClick={() => filter({ [key]: "" })}>{label}<span aria-hidden="true">×</span></button>)}
             {filtered && <button className="subtle-link" type="button" disabled={navigationLocked} onClick={() => filter({ status: "all", query: "", firmId: "", region: "", category: "" })}>Clear filters</button>}
           </div>
-          <div className="admin-select-controls"><label>Status<select aria-label="Status" value={controls.status} disabled={navigationLocked} onChange={(event) => filter({ status: event.target.value })}>{adminStatuses[controls.view].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+          <div className="admin-select-controls">{!board && <label>Status<select aria-label="Status" value={controls.status} disabled={navigationLocked} onChange={(event) => filter({ status: event.target.value })}>{adminStatuses[controls.view].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>}
             <label>Sort<select aria-label="Sort by submission date" value={controls.sort} disabled={navigationLocked} onChange={(event) => filter({ sort: event.target.value as AdminLocation["sort"] })}><option value="oldest">Oldest submitted</option><option value="newest">Newest submitted</option></select></label>
           </div>
         </div>
         <section className="admin-collection" aria-label={`${title} records`} aria-busy={loading || !!pending}>
-          <div className="admin-collection-summary"><p>{currentPage ? `${items.length} of ${currentPage.totalCount} ${location.view === "cases" ? "cases" : "leads"} shown` : listError ? "Records unavailable" : "Loading records…"}</p>
+          <div className="admin-collection-summary"><p>{board ? currentBoardSummary?.totalCount === undefined ? "Cases by progress" : `${items.length} of ${currentBoardSummary.totalCount} cases shown` : currentPage ? `${items.length} of ${currentPage.totalCount} ${location.view === "cases" ? "cases" : "leads"} shown` : listError ? "Records unavailable" : "Loading records…"}</p>
             <span role="status">{pending ? pending.leadId ? "Opening record…" : "Updating results…" : loading && currentPage ? "Updating…" : ""}</span>
           </div>
           {listError && <div className="admin-local-error" role="alert"><p>{listError}</p><button className="subtle-link" type="button" onClick={() => retryLocation ? void navigate(retryLocation) : void refreshCollection()}>Try again</button></div>}
-          {!currentPage ? <div className="admin-loading">{listError ? "Records are temporarily unavailable." : "Loading the workspace…"}</div>
+          {board ? <div className="admin-board-canvas">
+            {filtered && currentBoardSummary?.empty && <div className="admin-board-empty"><p>No cases match these filters.</p><button className="subtle-link" type="button" disabled={navigationLocked} onClick={() => filter({ query: "", firmId: "", region: "", category: "" })}>Clear filters</button></div>}
+            <FirmCaseBoard location={location} showFirm selectedId={location.leadId} locked={navigationLocked || !!pending} refreshVersion={refreshVersion}
+              cache={boardCache.current} onSelect={select} onRecordsChange={receiveBoardRecords} onSummaryChange={receiveBoardSummary}
+              onAccessLost={() => { boardCache.current.clear(); void recheckRecordAccess(); }} />
+          </div> : !currentPage ? <div className="admin-loading">{listError ? "Records are temporarily unavailable." : "Loading the workspace…"}</div>
             : !items.length ? <div className="admin-empty"><h2>{filtered ? "No matching records" : location.view === "attention" ? "No leads need attention" : location.view === "cases" ? "No cases yet" : "No leads yet"}</h2>
               <p>{filtered ? "Try fewer filters or a different plaintiff name or record ID." : location.view === "attention" ? "Every lead has a firm or a final decision. You can browse leads or review existing cases." : location.view === "cases" ? "Accepted leads become cases. You can review leads and their firm assignments." : "New requests will appear here after a plaintiff submits an intake."}</p>
               <div>{filtered && <button className="button" type="button" disabled={navigationLocked} onClick={() => filter({ status: "all", query: "", firmId: "", region: "", category: "" })}>Clear filters</button>}

@@ -7,7 +7,7 @@ import { AccountSwitcher, Brand } from "./workspace-chrome";
 import { FirmCaseDetail, FirmLeadDetail, FirmStatusBadge, firmIssueExcerpt, type FirmCaseRecord } from "./firm-records";
 import { FirmCaseBoard, hasFirmBoardData, prepareFirmBoard, type FirmBoardCache, type FirmBoardGroup, type FirmBoardSummary } from "./firm-case-board";
 import { FirmRecordPanel } from "./firm-record-panel";
-import { caseViews, emptyFirmLocation, firmListUrl, firmUrl, hasFirmDestination, leadViews, readFirmLocation, type FirmFilter, type FirmLayout, type FirmLocation, type FirmView } from "./firm-navigation";
+import { caseViews, emptyFirmLocation, firmListUrl, firmUrl, leadViews, readFirmLocation, type FirmFilter, type FirmLayout, type FirmLocation, type FirmView } from "./firm-navigation";
 import { animateWorkspace, stopWorkspaceTransition } from "./workspace-motion";
 import type { Account, Lead, User } from "./workspace";
 import "./firm-workspace.css";
@@ -81,8 +81,6 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
   const [location, setLocation] = useState(() => initialLocation(user.id));
   const preferredLayout = useRef(location.layout);
   const listFilter = useRef<FirmFilter>(location.view === "cases" ? location.filter : "all");
-  const freshArrival = useRef(!hasFirmDestination());
-  const autoOpenSingle = useRef(true);
   const [openingWorkspace, setOpeningWorkspace] = useState(true);
   const locationRef = useRef(location);
   locationRef.current = location;
@@ -241,13 +239,11 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
     currentHref.current = window.location.href;
   }
 
-  function navigate(next: FirmLocation, scope: "page" | "detail" | "drawer" | "record" | "collection" = "collection", openSingle = false) {
+  function navigate(next: FirmLocation, scope: "page" | "detail" | "drawer" | "record" | "collection" = "collection") {
     if (navigationLocked) return;
     const change = () => {
       navigationRevision.current += 1;
       const revision = navigationRevision.current;
-      freshArrival.current = false;
-      autoOpenSingle.current = openSingle;
       setOpeningWorkspace(false);
       setCollectionError("");
       const current = locationRef.current;
@@ -282,20 +278,12 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
         return { lead, record: result?.case };
       };
       void (async () => {
-        const [loaded, initialDetail] = await Promise.all([
+        const [loaded, detail] = await Promise.all([
           needsCollection ? targetBoard
             ? prepareFirmBoard(next, boardCache.current, version, controller.signal).then(() => undefined)
             : loadPage(targetPath, controller.signal) : Promise.resolve(undefined),
           changesRecord ? loadDetail(next) : Promise.resolve(undefined),
         ]);
-        let destination = next;
-        let detail = initialDetail;
-        if (loaded && openSingle && !next.leadId && loaded.items.length === 1 && !loaded.nextCursor) {
-          const only = loaded.items[0];
-          destination = { ...next, leadId: only.id, caseId: next.view === "cases" ? only.caseId ?? undefined : undefined };
-          setPendingRecord(only.id);
-          detail = await loadDetail(destination);
-        }
         if (controller.signal.aborted || revision !== navigationRevision.current) return;
         const commit = () => {
           if (controller.signal.aborted || revision !== navigationRevision.current) return;
@@ -312,10 +300,9 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
             arrivalPage.current = loaded;
             setPage(loaded);
             setLoading(false);
-            autoOpenSingle.current = false;
           } else if (changesCollection && !targetBoard) setPage(settledPages.current.get(targetPath));
           if (changesCollection) setListAttempt((value) => Math.max(value, version));
-          applyLocation(destination);
+          applyLocation(next);
         };
         animateWorkspace(scope, commit);
       })().catch((failure: unknown) => {
@@ -345,7 +332,7 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
       if (location.leadId) select();
       return;
     }
-    navigate(memories.current[view], "collection", true);
+    navigate(memories.current[view], "collection");
   }
 
   function changeFilter(filter: FirmFilter) {
@@ -381,8 +368,6 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
 
   historyHandler.current = (event) => {
     navigationRevision.current += 1;
-    freshArrival.current = false;
-    autoOpenSingle.current = false;
     setOpeningWorkspace(false);
     if (historyRestore.current) {
       const restored = historyRestore.current;
@@ -430,8 +415,6 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
   const onAccessLost = useCallback(() => {
     if (locationRef.current.leadId !== location.leadId) return;
     navigationRevision.current += 1;
-    freshArrival.current = false;
-    autoOpenSingle.current = false;
     arrivalPage.current = undefined;
     navigationRequest.current?.abort();
     navigationRequest.current = undefined;
@@ -465,7 +448,6 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
   useEffect(() => {
     const stopMore = () => { moreRequest.current?.abort(); moreRequest.current = undefined; };
     if (board) {
-      autoOpenSingle.current = false;
       arrivalPage.current = undefined;
       setLoading(false);
       setListError("");
@@ -484,28 +466,9 @@ export function FirmWorkspace({ user, accounts, switchAccount, signOut, sessionA
     setListError("");
     setMoreError("");
     setLoadingMore(false);
-    const navigation = navigationRevision.current;
-    loadWindow(path, pageRef.current, controller.signal).then(async (loaded) => {
+    loadWindow(path, pageRef.current, controller.signal).then((loaded) => {
       const current = () => !controller.signal.aborted && revision === listRevision.current;
       if (!current()) return;
-      let destination = locationRef.current;
-      if (freshArrival.current && navigation === navigationRevision.current && loaded.items.length === 0) {
-        const casesLocation = { ...emptyFirmLocation("cases"), layout: preferredLayout.current };
-        const cases = await loadPage(firmListUrl(casesLocation), controller.signal);
-        if (!current()) return;
-        if (navigation === navigationRevision.current && cases.items.length > 0) { destination = casesLocation; loaded = cases; }
-        else destination = locationRef.current;
-      }
-      freshArrival.current = false;
-      if (autoOpenSingle.current && navigation === navigationRevision.current && !(destination.view === "cases" && destination.layout === "board") && !destination.leadId && loaded.items.length === 1 && !loaded.nextCursor) {
-        const only = loaded.items[0];
-        destination = { ...destination, leadId: only.id, caseId: destination.view === "cases" ? only.caseId ?? undefined : undefined };
-      }
-      autoOpenSingle.current = false;
-      if (destination !== locationRef.current) {
-        if (destination.view !== locationRef.current.view) arrivalPage.current = loaded;
-        applyLocation(destination, "replace");
-      }
       setPage(loaded);
       setOpeningWorkspace(false);
     }).catch((error: unknown) => {

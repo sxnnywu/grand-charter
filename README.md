@@ -41,6 +41,8 @@ Maya starts with an Employment request waiting for Northline Legal’s decision 
 
 For the admin queue, submit a **Housing** lead in **Quebec**. Morgan can find and assign it under **Needs attention**, alongside leads declined by a firm. Use **All leads** for the full intake history. A **Housing** lead in **Ontario** routes directly to Harbour Law. Routing is evaluated when a lead is submitted.
 
+Firm staff start in **Review leads**. Under **Manage cases**, every firm can switch between **List** and **Board**, including when it has no cases. Admins have the same views under **Cases**, with search and firm, province, and category filters. **Needs attention** stays a table for assignment decisions.
+
 If a firm declines a lead, Morgan can send it back for review or close it. The plaintiff can see a notice after reassignment or closure. Morgan can open the record to inspect its audit history.
 
 Accounts and routing rules are seeded during setup. Cases move from **New case** to **In progress** to **Closed**. Closed cases are read-only for plaintiffs and firm staff. Admins can still reassign them. PDFs are limited to 10 MB and stored in the private local folder `.data/documents`. Keep that folder and the database volume to retain uploads between runs.

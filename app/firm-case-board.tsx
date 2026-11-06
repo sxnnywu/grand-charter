@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { isAccessError, messageFor, request } from "./api-client";
 import { firmIssueExcerpt } from "./firm-records";
-import type { FirmLocation } from "./firm-navigation";
 import type { Lead } from "./workspace";
 import "./firm-case-board.css";
 
@@ -16,13 +15,15 @@ type Column = typeof columns[number];
 type CaseStatus = Column["status"];
 type CasePage = { cases: { lead: Lead }[]; nextCursor: string | null; totalCount?: number };
 export type FirmBoardGroup = { status: CaseStatus; items: Lead[]; nextCursor: string | null };
-export type FirmBoardSummary = { loading: boolean; empty: boolean; error: boolean };
+export type FirmBoardSummary = { loading: boolean; empty: boolean; error: boolean; totalCount?: number };
+type BoardLocation = { query: string; region: string; category: string; firmId?: string; sort?: "oldest" | "newest" };
 type ColumnData = { items: Lead[]; nextCursor: string | null; totalCount?: number; pages: number; newIds: Set<string> };
 type ColumnResult = { path: string; requestKey: string; data?: ColumnData; error?: string };
 export type FirmBoardCache = Map<string, ColumnResult>;
 type ColumnReport = FirmBoardGroup & { path: string; totalCount?: number; loading: boolean; error: boolean; ready: boolean };
 type Props = {
-  location: FirmLocation;
+  location: BoardLocation;
+  showFirm?: boolean;
   selectedId?: string;
   locked: boolean;
   refreshVersion: number;
@@ -36,11 +37,13 @@ const emptyItems: Lead[] = [];
 const dateFormat = new Intl.DateTimeFormat("en-CA", { dateStyle: "medium" });
 const numberFormat = new Intl.NumberFormat("en-CA");
 
-function columnPath(location: FirmLocation, status: CaseStatus) {
+function columnPath(location: BoardLocation, status: CaseStatus) {
   const params = new URLSearchParams({ status });
   if (location.query) params.set("q", location.query);
   if (location.region) params.set("region", location.region);
   if (location.category) params.set("category", location.category);
+  if (location.firmId) params.set("firmId", location.firmId);
+  if (location.sort) params.set("sort", location.sort);
   return `/api/cases?${params}`;
 }
 
@@ -54,7 +57,7 @@ function appendCases(items: Lead[], page: CasePage, status: CaseStatus) {
   }
 }
 
-export async function prepareFirmBoard(location: FirmLocation, cache: FirmBoardCache, version: number, signal: AbortSignal) {
+export async function prepareFirmBoard(location: BoardLocation, cache: FirmBoardCache, version: number, signal: AbortSignal) {
   const prepared = await Promise.all(columns.map(async (column): Promise<ColumnResult> => {
     const path = columnPath(location, column.status);
     const page = await request<CasePage>(`${path}&count=true`, { signal });
@@ -68,11 +71,11 @@ export async function prepareFirmBoard(location: FirmLocation, cache: FirmBoardC
   for (const result of prepared) cache.set(result.path, result);
 }
 
-export function hasFirmBoardData(location: FirmLocation, cache: FirmBoardCache) {
+export function hasFirmBoardData(location: BoardLocation, cache: FirmBoardCache) {
   return columns.every((column) => !!cache.get(columnPath(location, column.status))?.data);
 }
 
-function CaseColumn({ column, location, selectedId, locked, refreshVersion, onSelect, onAccessLost, onReport, cache }: Props & {
+function CaseColumn({ column, location, selectedId, locked, refreshVersion, onSelect, onAccessLost, onReport, cache, showFirm }: Props & {
   column: Column;
   onReport: (report: ColumnReport) => void;
 }) {
@@ -97,7 +100,7 @@ function CaseColumn({ column, location, selectedId, locked, refreshVersion, onSe
   accessLost.current = onAccessLost;
   const scroll = useRef<HTMLDivElement>(null);
   const scrollAnchor = useRef<{ id: string; offset: number; top: number } | undefined>(undefined);
-  const filtered = !!(location.query || location.region || location.category);
+  const filtered = !!(location.query || location.region || location.category || location.firmId);
   const headingId = `firm-board-${column.status}-heading`;
 
   useLayoutEffect(() => {
@@ -147,8 +150,9 @@ function CaseColumn({ column, location, selectedId, locked, refreshVersion, onSe
         nextCursor = page.nextCursor;
         pages += 1;
         const last = items.at(-1);
-        const reachedBoundary = !boundary || !!last && (Date.parse(last.createdAt) < Date.parse(boundary.createdAt)
-          || (Date.parse(last.createdAt) === Date.parse(boundary.createdAt) && last.id <= boundary.id));
+        const comparison = last && boundary ? Date.parse(last.createdAt) - Date.parse(boundary.createdAt)
+          || (last.id < boundary.id ? -1 : last.id > boundary.id ? 1 : 0) : 0;
+        const reachedBoundary = !boundary || !!last && (location.sort === "oldest" ? comparison >= 0 : comparison <= 0);
         if (!nextCursor || (pages >= previousPages && reachedBoundary) || pages >= previousPages + 2 || cursors.has(nextCursor)) break;
         cursors.add(nextCursor);
       } while (nextCursor);
@@ -248,10 +252,11 @@ function CaseColumn({ column, location, selectedId, locked, refreshVersion, onSe
         <div className="firm-case-column-cards">
           {data.items.map((lead) => <button className={`firm-case-card${selectedId === lead.id ? " is-selected" : ""}${data.newIds.has(lead.id) ? " is-new" : ""}`}
             type="button" key={lead.id} data-lead-id={lead.id} data-record-id={lead.id} disabled={locked} aria-pressed={selectedId === lead.id}
-            aria-label={`Open case for ${lead.name}: ${firmIssueExcerpt(lead.description, 100)} ${lead.category}, ${lead.region}.`} onClick={() => onSelect(lead)}>
+            aria-label={`Open case for ${lead.name}: ${firmIssueExcerpt(lead.description, 100)} ${lead.category}, ${lead.region}.${showFirm ? ` Firm: ${lead.firmName ?? "Unassigned"}.` : ""}`} onClick={() => onSelect(lead)}>
             <span className="firm-case-card-heading"><strong>{lead.name}</strong><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="m9 6 6 6-6 6" /></svg></span>
             <span className="firm-case-card-issue">{firmIssueExcerpt(lead.description, 120)}</span>
             <span className="firm-case-card-context">{lead.category} · {lead.region}</span>
+            {showFirm && <span className="firm-case-card-context">{lead.firmName ?? "Unassigned"}</span>}
             <time dateTime={lead.createdAt}>Submitted {dateFormat.format(new Date(lead.createdAt))}</time>
           </button>)}
         </div>
@@ -298,7 +303,9 @@ export function FirmCaseBoard(props: Props) {
       items: current[index]?.items ?? emptyItems, nextCursor: current[index]?.nextCursor ?? null })));
     const loading = current.some((report) => !report || report.loading);
     const error = current.some((report) => report?.error);
-    callbacks.current.summary?.({ loading, error, empty: !loading && !error && current.every((report) => report?.ready && !report.items.length && !report.nextCursor) });
+    const totalCount = current.every((report) => report?.totalCount !== undefined)
+      ? current.reduce((sum, report) => sum + report!.totalCount!, 0) : undefined;
+    callbacks.current.summary?.({ loading, error, totalCount, empty: !loading && !error && current.every((report) => report?.ready && !report.items.length && !report.nextCursor) });
   }, [reports, filterKey]);
 
   const jumpToColumn = useCallback((status: CaseStatus, smooth: boolean) => {

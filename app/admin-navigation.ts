@@ -9,6 +9,7 @@ export type AdminLocation = {
   region: string;
   category: string;
   sort: "oldest" | "newest";
+  layout: "list" | "board";
   leadId?: string;
   caseId?: string;
 };
@@ -21,7 +22,7 @@ export const adminStatuses = {
 } as const;
 
 export function emptyAdminLocation(view: AdminView): AdminLocation {
-  return { view, status: "all", query: "", firmId: "", region: "", category: "", sort: view === "attention" ? "oldest" : "newest" };
+  return { view, status: "all", query: "", firmId: "", region: "", category: "", sort: view === "attention" ? "oldest" : "newest", layout: "list" };
 }
 
 export function readAdminLocation(href = typeof window === "undefined" ? "http://localhost/" : window.location.href): AdminLocation {
@@ -31,6 +32,7 @@ export function readAdminLocation(href = typeof window === "undefined" ? "http:/
     : params.has("case") ? "cases" : params.has("lead") ? "leads" : "attention");
   const status = params.get("status") ?? params.get(location.view === "cases" ? "caseStatus" : "leadStatus");
   if (adminStatuses[location.view].some(([value]) => value === status)) location.status = status!;
+  if (location.view === "cases" && params.get("layout") === "board") { location.layout = "board"; location.status = "all"; }
   location.query = (params.get("q") ?? "").trim().slice(0, 120);
   location.firmId = params.get("firmId") ?? "";
   const region = params.get("region") ?? "";
@@ -47,6 +49,7 @@ export function adminUrl(location: AdminLocation) {
   const url = new URL(window.location.href);
   for (const key of ["view", "status", "leadStatus", "caseStatus", "firmId", "region", "category", "q", "sort", "lead", "case", "layout"]) url.searchParams.delete(key);
   url.searchParams.set("view", location.view);
+  if (location.view === "cases") url.searchParams.set("layout", location.layout);
   if (location.status !== "all") url.searchParams.set("status", location.status);
   if (location.query) url.searchParams.set("q", location.query);
   if (location.firmId) url.searchParams.set("firmId", location.firmId);

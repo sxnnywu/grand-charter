@@ -64,6 +64,8 @@
 .admin-empty .button { min-height: 35px; font-size: 12px; }
 .admin-empty .subtle-link { font-size: 12px; }
 .admin-pagination { display: flex; justify-content: center; padding: 15px; border-top: 1px solid var(--line); }
+.admin-board-canvas { min-width: 0; padding: 14px; }
+.admin-board-empty { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 4px 0 15px; color: var(--muted); font-size: 12px; }
 .admin-local-error { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-block: 10px; color: var(--danger); font-size: 12px; line-height: 1.6; }
 .admin-collection > .admin-local-error { padding-inline: 18px; }
 .admin-local-error .subtle-link { font-size: 12px; }
