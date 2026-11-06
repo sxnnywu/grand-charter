@@ -1,0 +1,287 @@
+.firm-record {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.firm-record-header {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: 24px clamp(22px, 3vw, 32px);
+  border-bottom: 1px solid var(--line);
+}
+
+.firm-record.is-in-panel .firm-record-header {
+  gap: 8px;
+  padding-block: 19px;
+}
+
+.firm-record.is-in-panel .firm-review-footer {
+  border-radius: 0;
+}
+
+.firm-record-back {
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.firm-record-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  min-width: 0;
+}
+
+.firm-record-title h2 {
+  min-width: 0;
+  font: 500 clamp(28px, 3vw, 36px)/1.15 var(--display-font);
+  letter-spacing: -.035em;
+  overflow-wrap: anywhere;
+}
+
+.firm-record-context {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.firm-record-email {
+  max-width: 100%;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.firm-record-issue {
+  display: -webkit-box;
+  max-width: 56ch;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.firm-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 3px 8px;
+  border: 1px solid #d8deef;
+  border-radius: 5px;
+  color: #35477e;
+  background: #edf0f9;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.firm-status-badge::before {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 5px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.firm-status-active {
+  border-color: #d8e6df;
+  color: #2c674b;
+  background: #edf5f0;
+}
+
+.firm-status-quiet {
+  border-color: #dedfe3;
+  color: #555e70;
+  background: #f1f2f4;
+}
+
+.firm-record-body {
+  padding: 25px clamp(22px, 3vw, 32px) 28px;
+}
+
+.firm-record-inquiry h3 {
+  margin-bottom: 12px;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.firm-record-narrative {
+  max-width: 68ch;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.firm-record-documents {
+  margin-top: 25px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.firm-record-documents > .detail-section,
+.firm-record-tools > .detail-section:first-child {
+  margin-top: 0;
+}
+
+.firm-record-outcome {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 25px;
+  padding: 17px;
+  border: 1px solid #d8e6df;
+  border-radius: 8px;
+  background: #edf5f0;
+}
+
+.firm-record-outcome h3 {
+  font-size: 15px;
+}
+
+.firm-record-outcome h3:focus {
+  outline: none;
+}
+
+.firm-record-outcome-neutral {
+  border-color: var(--line);
+  background: var(--canvas);
+}
+
+.firm-record-outcome p,
+.firm-record-outcome span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.firm-record-outcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+}
+
+.firm-review-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px clamp(22px, 3vw, 32px);
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 12px 12px;
+  background: var(--paper);
+}
+
+.firm-review-footer > p {
+  flex: 1 1 170px;
+  max-width: 42ch;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.firm-review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.firm-review-accepted {
+  background: #f3f5fa;
+}
+
+.firm-record-details {
+  margin-top: 27px;
+  padding-top: 19px;
+  border-top: 1px solid var(--line);
+}
+
+.firm-record-details > summary {
+  width: fit-content;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.firm-record-details-body {
+  display: grid;
+  gap: 22px;
+  padding-top: 19px;
+}
+
+.firm-record-metadata {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 20px;
+  margin: 0;
+}
+
+.firm-record-metadata dt {
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.firm-record-metadata dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.firm-record-reference {
+  grid-column: 1 / -1;
+}
+
+.firm-record-loading {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.firm-record dialog .dialog-footer {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  .firm-record {
+    border-radius: 10px;
+  }
+
+  .firm-record-header,
+  .firm-record-body {
+    padding: 21px 20px;
+  }
+
+  .firm-review-footer {
+    padding: 14px 20px;
+    border-radius: 0 0 10px 10px;
+  }
+
+  .firm-record-title h2 {
+    font-size: 30px;
+  }
+
+  .firm-review-actions {
+    width: 100%;
+  }
+
+  .firm-review-actions > .button {
+    flex: 1;
+    justify-content: center;
+  }
+}

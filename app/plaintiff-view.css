@@ -1,0 +1,416 @@
+.plaintiff-home-view {
+  width: min(100%, 1180px);
+  margin-inline: auto;
+}
+
+.plaintiff-home-heading {
+  margin-bottom: 28px;
+}
+
+.plaintiff-home-heading h1 {
+  font-size: clamp(30px, 3vw, 36px);
+}
+
+.plaintiff-home-heading h1:focus {
+  outline: none;
+}
+
+.plaintiff-home-heading p {
+  font-size: 13px;
+}
+
+.plaintiff-home-loading {
+  padding: 35px 0;
+  color: var(--muted);
+}
+
+.plaintiff-home-start {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(270px, .8fr);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 0 10px 30px #282c3706;
+}
+
+.plaintiff-home-start-copy {
+  align-content: center;
+  padding: clamp(30px, 5vw, 62px);
+}
+
+.plaintiff-home-welcome {
+  display: block;
+  margin-bottom: 13px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.plaintiff-home-start h2 {
+  max-width: 14ch;
+  margin-bottom: 16px;
+  font-family: var(--display-font);
+  font-size: clamp(34px, 4vw, 44px);
+  font-weight: 500;
+  letter-spacing: -.04em;
+  line-height: 1.12;
+}
+
+.plaintiff-home-start-copy > p {
+  max-width: 41ch;
+  margin-bottom: 26px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.plaintiff-home-start-guide {
+  padding: 32px 30px;
+  border-left: 1px solid var(--line);
+  background: #f3f1eb;
+}
+
+.plaintiff-home-paper {
+  display: grid;
+  width: 58px;
+  height: 66px;
+  place-items: center;
+  margin-bottom: 25px;
+  border: 1px solid #d8d3c8;
+  border-radius: 5px;
+  background: var(--paper);
+  color: var(--indigo);
+  box-shadow: 4px 4px 0 #e4dfd3;
+  transform: rotate(-4deg);
+}
+
+.plaintiff-home-start-guide h3 {
+  margin-bottom: 19px;
+  font-size: 14px;
+}
+
+.plaintiff-home-start-guide ol {
+  display: grid;
+  gap: 21px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.plaintiff-home-start-guide li {
+  display: flex;
+  align-items: start;
+  gap: 12px;
+}
+
+.plaintiff-home-start-guide li > span {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  place-items: center;
+  border: 1px solid #d8d3c8;
+  border-radius: 50%;
+  color: var(--indigo);
+  font-size: 12px;
+}
+
+.plaintiff-home-start-guide strong {
+  font-size: 13px;
+}
+
+.plaintiff-home-start-guide li p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.plaintiff-home-bookshelf {
+  grid-template-columns: minmax(255px, .66fr) minmax(0, 1.45fr);
+  gap: clamp(20px, 3vw, 38px);
+}
+
+.plaintiff-home-index {
+  top: 95px;
+  max-height: calc(100dvh - 115px);
+}
+
+.plaintiff-home-index .card-heading {
+  padding: 0 9px 2px;
+}
+
+.plaintiff-home-index h2 {
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.plaintiff-home-index .plaintiff-request-card {
+  gap: 7px 11px;
+  padding: 19px 10px;
+}
+
+.plaintiff-request-icon {
+  display: grid;
+  width: 33px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--indigo);
+}
+
+.plaintiff-request-copy {
+  display: grid;
+  justify-items: start;
+  gap: 7px;
+}
+
+.plaintiff-request-copy > * {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.plaintiff-home-index .plaintiff-request-copy .request-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.plaintiff-request-firm,
+.plaintiff-request-category {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.plaintiff-request-category {
+  color: var(--indigo);
+  font-weight: 600;
+}
+
+.plaintiff-request-copy small {
+  font-size: 11px;
+}
+
+.plaintiff-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 3px 8px;
+  border: 1px solid #d8deef;
+  border-radius: 5px;
+  background: #edf0f9;
+  color: #35477e;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.plaintiff-status::before {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 5px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.plaintiff-status-waiting {
+  border-color: #dedfe3;
+  background: #f1f2f4;
+  color: #555e70;
+}
+
+.plaintiff-status-active {
+  border-color: #d8e6df;
+  background: #edf5f0;
+  color: #2c674b;
+}
+
+.plaintiff-status-closed {
+  border-color: #dededb;
+  background: #f1f1ed;
+  color: #60645f;
+}
+
+.plaintiff-home-overview {
+  padding: clamp(25px, 4vw, 40px);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.plaintiff-home-overview-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 27px;
+}
+
+.plaintiff-home-section-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.plaintiff-home-overview h2 {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-bottom: 10px;
+  font-family: var(--display-font);
+  font-size: clamp(28px, 3vw, 35px);
+  font-weight: 500;
+  letter-spacing: -.025em;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.plaintiff-home-overview-meta {
+  margin-bottom: 18px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.plaintiff-home-overview-message {
+  max-width: 50ch;
+  margin-bottom: 22px;
+  color: var(--muted);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.plaintiff-home-update-date {
+  display: block;
+  margin: -7px 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.plaintiff-home-overview-next-step {
+  margin-top: -8px;
+  margin-bottom: 22px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+@media (max-width: 920px) {
+  .plaintiff-home-start {
+    grid-template-columns: minmax(0, 1fr) minmax(250px, .8fr);
+  }
+
+  .plaintiff-home-start-copy {
+    padding: 32px;
+  }
+}
+
+@media (max-width: 760px) {
+  .plaintiff-home-heading {
+    margin-bottom: 23px;
+  }
+
+  .plaintiff-home-heading h1 {
+    font-size: 31px;
+  }
+
+  .plaintiff-home-heading p {
+    max-width: 24ch;
+    font-size: 12px;
+  }
+
+  .plaintiff-home-start {
+    grid-template-columns: 1fr;
+  }
+
+  .plaintiff-home-start-copy {
+    padding: 30px 25px;
+  }
+
+  .plaintiff-home-start h2 {
+    max-width: 15ch;
+    font-size: 35px;
+  }
+
+  .plaintiff-home-start-guide {
+    padding: 27px 25px;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .plaintiff-home-paper {
+    display: none;
+  }
+
+  .plaintiff-home-view .bookshelf:not(.has-selection) {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .plaintiff-home-view .bookshelf:not(.has-selection) .bookshelf-reading {
+    display: block;
+    order: -1;
+    width: 100%;
+  }
+
+  .plaintiff-home-index {
+    width: 100%;
+    max-height: none;
+    padding: 0;
+  }
+
+  .plaintiff-home-view:has(.bookshelf.has-selection) > .plaintiff-home-heading {
+    display: none;
+  }
+
+  .plaintiff-home-overview {
+    padding: 18px;
+  }
+
+  .plaintiff-home-overview-heading {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .plaintiff-home-overview h2 {
+    margin-bottom: 8px;
+    font-size: 23px;
+    line-height: 1.2;
+    -webkit-line-clamp: 2;
+  }
+
+  .plaintiff-home-overview-meta {
+    margin-bottom: 10px;
+    font-size: 11px;
+  }
+
+  .plaintiff-home-overview-message {
+    margin-bottom: 13px;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .plaintiff-home-overview-next-step {
+    margin: -4px 0 13px;
+  }
+
+  .plaintiff-home-update-date {
+    margin-top: -4px;
+  }
+
+  .plaintiff-home-overview > .button {
+    min-height: 36px;
+    padding: 8px 11px;
+    font-size: 12px;
+  }
+}

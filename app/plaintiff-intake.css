@@ -1,0 +1,275 @@
+.plaintiff-intake {
+  max-width: 1160px;
+  margin-inline: auto;
+}
+
+.plaintiff-intake-back {
+  margin-bottom: 18px;
+}
+
+.plaintiff-intake-heading h1 {
+  font-size: clamp(31px, 4vw, 40px);
+}
+
+.plaintiff-intake-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(245px, .4fr);
+  align-items: start;
+  gap: 24px;
+}
+
+.plaintiff-intake-form {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+  padding: clamp(22px, 2.5vw, 26px);
+}
+
+.plaintiff-intake-required {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.plaintiff-intake-draft-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.plaintiff-intake-group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.plaintiff-intake-group:first-of-type {
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.plaintiff-intake-group legend {
+  margin-bottom: 12px;
+  padding: 0;
+  font-family: var(--display-font);
+  font-size: 22px;
+  letter-spacing: -.025em;
+}
+
+.plaintiff-intake-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 18px;
+}
+
+.plaintiff-intake-fields .field small {
+  margin-top: 2px;
+  line-height: 1.45;
+}
+
+.plaintiff-intake-form [aria-invalid="true"] {
+  border-color: #a84b43;
+}
+
+.plaintiff-intake-form .plaintiff-intake-field-error {
+  color: #983c35;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.plaintiff-intake-description-feedback {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 5px 15px;
+}
+
+.plaintiff-intake-character-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.plaintiff-intake-description {
+  margin-top: 16px;
+}
+
+.plaintiff-intake-description textarea {
+  min-height: 124px;
+}
+
+.plaintiff-intake-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding-top: 3px;
+}
+
+.plaintiff-intake-actions > .subtle-link {
+  padding-block: 8px;
+}
+
+.plaintiff-intake dialog .dialog-footer {
+  flex-wrap: wrap;
+}
+
+.plaintiff-intake-form > .workspace-message {
+  margin: 0;
+}
+
+.plaintiff-intake-next {
+  position: sticky;
+  top: 96px;
+  padding: 24px;
+  background: #f4f2ec;
+}
+
+.plaintiff-intake-next > h2 {
+  font-family: var(--display-font);
+  font-size: 25px;
+  font-weight: 500;
+  letter-spacing: -.03em;
+}
+
+.plaintiff-intake-next ol {
+  display: grid;
+  gap: 23px;
+  margin: 23px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plaintiff-intake-next li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: start;
+  gap: 11px;
+}
+
+.plaintiff-intake-next li > span {
+  display: grid;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  border: 1px solid #d7d5cc;
+  border-radius: 50%;
+  color: var(--indigo);
+  background: var(--paper);
+  font-size: 12px;
+}
+
+.plaintiff-intake-next h3 {
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.plaintiff-intake-next li p {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.plaintiff-intake-documents {
+  margin-top: 25px;
+  padding-top: 17px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.plaintiff-confirmation {
+  max-width: 680px;
+  margin: 30px auto;
+  padding: clamp(25px, 4vw, 45px);
+}
+
+.plaintiff-confirmation-mark {
+  display: grid;
+  width: 53px;
+  height: 53px;
+  margin-bottom: 25px;
+  place-items: center;
+  border: 1px solid #d6dbea;
+  border-radius: 10px;
+  color: var(--indigo);
+  background: var(--indigo-pale);
+}
+
+.plaintiff-confirmation-category {
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.plaintiff-confirmation h1 {
+  font-family: var(--display-font);
+  font-size: clamp(29px, 4vw, 38px);
+  font-weight: 500;
+  line-height: 1.16;
+  letter-spacing: -.04em;
+}
+
+.plaintiff-confirmation-summary {
+  margin-top: 14px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.plaintiff-confirmation-next {
+  margin: 27px 0;
+  padding: 22px 0;
+  border-block: 1px solid var(--line);
+}
+
+.plaintiff-confirmation-next h2 {
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.plaintiff-confirmation-next p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.plaintiff-confirmation-next p + p {
+  margin-top: 9px;
+}
+
+@media (max-width: 920px) {
+  .plaintiff-intake-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .plaintiff-intake-next {
+    position: static;
+  }
+}
+
+@media (max-width: 560px) {
+  .plaintiff-intake-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  .plaintiff-intake-actions {
+    justify-content: stretch;
+  }
+
+  .plaintiff-intake-actions .button.primary {
+    flex: 1;
+  }
+
+  .plaintiff-confirmation {
+    margin-block: 8px;
+  }
+}

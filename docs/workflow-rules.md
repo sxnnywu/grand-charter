@@ -44,15 +44,16 @@ stateDiagram-v2
 
 ## Case state machine
 
-The agreed case statuses are **Open**, **In progress**, and **Closed**. The progress and closure transitions below are proposed defaults.
+The agreed case statuses are **New case**, **In progress**, and **Closed**. The progress and closure transitions below are proposed defaults.
 
 ```mermaid
 stateDiagram-v2
     direction LR
     state "In progress" as InProgress
 
-    [*] --> Open: Firm accepts the lead
-    Open --> InProgress: Start work (proposed)
+    state "New case" as NewCase
+    [*] --> NewCase: Firm accepts the lead
+    NewCase --> InProgress: Start work (proposed)
     InProgress --> Closed: Close case (proposed)
 ```
 
@@ -60,8 +61,8 @@ An admin can reassign a case in any state. The assigned firm changes and the cas
 
 | Current state | Action | Actor | Next state | What changes |
 | --- | --- | --- | --- | --- |
-| Case creation | Accept the linked lead | Assigned firm staff | Open | The new case starts with the same plaintiff and assigned firm as the lead. PDFs already uploaded by the plaintiff are available on the case. |
-| Open | Start work (proposed) | Assigned firm staff | In progress | The new status is visible to the plaintiff. |
+| Case creation | Accept the linked lead | Assigned firm staff | New case | The new case starts with the same plaintiff and assigned firm as the lead. PDFs already uploaded by the plaintiff are available on the case. |
+| New case | Start work (proposed) | Assigned firm staff | In progress | The new status is visible to the plaintiff. |
 | In progress | Close the case (proposed) | Assigned firm staff | Closed | The case stays available to users with access. The linked lead stays Accepted. |
 | Any case status | Reassign the case | Admin | Same status | The case keeps its identity and progress. The case and linked lead move to the new firm together. Access changes with the assignment. |
 

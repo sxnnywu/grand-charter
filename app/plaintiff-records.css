@@ -1,0 +1,240 @@
+.plaintiff-record {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.plaintiff-record-header {
+  display: grid;
+  gap: 22px;
+  padding: 25px clamp(20px, 3vw, 32px) 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.plaintiff-record-header > .subtle-link {
+  justify-self: start;
+  font-size: 12px;
+}
+
+.plaintiff-record-heading h2 {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink);
+  font: 500 clamp(27px, 3vw, 35px)/1.15 var(--display-font);
+  letter-spacing: -.035em;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.plaintiff-record-heading > p:not(.plaintiff-case-label) {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.plaintiff-record-body {
+  padding: 24px clamp(20px, 3vw, 32px) 28px;
+}
+
+.plaintiff-record-status {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding-bottom: 24px;
+}
+
+.plaintiff-record-status h3 {
+  max-width: 38ch;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: -.02em;
+}
+
+.plaintiff-record-status > p {
+  max-width: 48ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.plaintiff-record-actions {
+  margin-top: 3px;
+}
+
+.plaintiff-record-updates {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.plaintiff-record-update {
+  display: grid;
+  gap: 7px;
+  padding: 15px 17px;
+  border-left: 2px solid var(--indigo);
+  background: #f2f3f8;
+}
+
+.plaintiff-record-update h3 {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.plaintiff-record-update p {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.plaintiff-record-update time {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.plaintiff-record-earlier > summary {
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.plaintiff-record-earlier .plaintiff-record-update {
+  margin-top: 12px;
+}
+
+.plaintiff-record-documents {
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+  scroll-margin-top: 100px;
+}
+
+.plaintiff-record-documents > .detail-section {
+  margin-top: 0;
+}
+
+.plaintiff-record-documents:focus,
+.plaintiff-case-content:focus {
+  outline: none;
+}
+
+.plaintiff-record-details {
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.plaintiff-record-details > summary {
+  width: fit-content;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.plaintiff-record-details-content {
+  display: grid;
+  gap: 22px;
+  padding-top: 18px;
+}
+
+.plaintiff-record-description {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.plaintiff-record-metadata {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 15px 20px;
+  margin: 0;
+}
+
+.plaintiff-record-metadata dt {
+  margin-bottom: 3px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.plaintiff-record-metadata dd {
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.plaintiff-record-reference {
+  grid-column: 1 / -1;
+}
+
+.plaintiff-case-summary {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+.plaintiff-case-status-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.plaintiff-case-firm {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.plaintiff-case-message {
+  max-width: 46ch;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.plaintiff-case-documents {
+  min-height: 32px;
+  font-size: 12px;
+}
+
+.plaintiff-case-content > .case-tool {
+  margin-top: 0;
+}
+
+.plaintiff-case-content .case-content {
+  margin-top: 25px;
+  padding-top: 24px;
+}
+
+.plaintiff-case-content [id$="-documents-panel"] {
+  scroll-margin-top: 100px;
+}
+
+.plaintiff-record-loading {
+  padding: 8px 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 760px) {
+  .plaintiff-record {
+    border-radius: 0;
+    border-inline: 0;
+  }
+
+  .plaintiff-record-header {
+    gap: 15px;
+    padding: 18px 20px;
+  }
+
+  .plaintiff-record-body {
+    padding: 22px 20px 28px;
+  }
+
+  .plaintiff-record-status h3 {
+    font-size: 19px;
+  }
+}
