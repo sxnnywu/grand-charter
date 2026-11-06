@@ -1,0 +1,34 @@
+app/workdesk.css
+  s_079498f144b51a::t_8dd1b2aec7f7dd 1-17,19-23,25-26,29-98,100-164,167-168,171-208
+  s_079498f144b51a::t_ccea552d016247 18,24,27-28,99,165-166,169-170
+app/admin-workspace.tsx
+  s_079498f144b51a::t_65c5f61a7fe2f7 423-438
+  s_079498f144b51a::t_f93c6b7e50a130 17,72,403,422,444,458-460,464
+app/firm-workspace.tsx
+  s_079498f144b51a::t_65c5f61a7fe2f7 710,712
+  s_079498f144b51a::t_e53a225035f1c2 14,89,658-662,678,706-709,713-722,729,751-753,760
+app/plaintiff-intake.css
+  s_079498f144b51a::t_a2b6ad80cc09f1 306-331
+app/plaintiff-intake.tsx
+  s_079498f144b51a::t_9a34a032dc99ec 194-195,235
+app/workspace-motion.ts
+  s_079498f144b51a::t_04e4d58240e574 5,47,49-53,72-76
+app/workspace.tsx
+  s_079498f144b51a::t_ec40162329fab8 775-793
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "29f818d296ab57e6975268a8cd600c098d4acf21",
+  "prompts": {},
+  "sessions": {
+    "s_079498f144b51a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1a8ad-f620-7f02-8c39-3413c6747d65",
+        "model": "gpt-6.1-sol"
+      },
+      "human_author": "Sunny Wu <w.sunny0618@gmail.com>"
+    }
+  }
+}
