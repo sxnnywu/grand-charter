@@ -60,6 +60,18 @@ server/documents.ts
   s_079498f144b51a::t_161715cbf7d286 5,18-19,41,45,171
 server/leads.ts
   s_079498f144b51a::t_349f6a1e7059a1 11-17,25-44,51,58,69,75-82,124,152,183,249-250,258-259,263-281,289,303,306,316-328,333
+scripts/db.mjs
+  s_079498f144b51a::t_8cc828416ef09b 4,55
+README.md
+  s_079498f144b51a::t_8cc828416ef09b 27-32
+scripts/seed-workspace.mjs
+  s_079498f144b51a::t_8cc828416ef09b 1-35
+db/workspace-data.mjs
+  s_079498f144b51a::t_8cc828416ef09b 1-94
+app/demo-account-guide.tsx
+  s_079498f144b51a::t_8cc828416ef09b 9,14-15,19,22,25,27-31,35
+docs/seed-data-plan.md
+  s_079498f144b51a::t_8cc828416ef09b 1,3,27,47,74
 ---
 {
   "schema_version": "authorship/3.0.0",
